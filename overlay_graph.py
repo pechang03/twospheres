@@ -1,8 +1,9 @@
+# overlay_graph.py
 import matplotlib.pyplot as plt
 import networkx as nx
-from two_spheres_g import plot_spheres  # Assuming the function to plot spheres is in this file
+# from two_spheres_g import plot_spheres  # Assuming the function to plot spheres is in this file
 
-# Use seed when creating the graph for reproducibility
+# Use seed when creating the grap for reproducibility
 G = nx.random_geometric_graph(200, 0.125, seed=896803)
 # position is stored as node attribute data for random_geometric_graph
 pos = nx.get_node_attributes(G, "pos")
@@ -32,5 +33,5 @@ nx.draw_networkx_nodes(
 )
 
 # Corrected line: plt.axis('off') -> plt.axis('off')
-plt.axis('off')
+plt.axis("off")
 plt.show()
