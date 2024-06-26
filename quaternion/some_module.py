@@ -32,10 +32,11 @@ u_grid, v_grid = np.meshgrid(u_values, v_values)
 theta, phi, r = spherical_coordinates(u_grid, v_grid)
 
 # Create a quaternion for rotation (30° around x and 45° around y)
-qx = quaternion.from_float_array(
+qx = np.quaternion.from_float_array(
     [np.cos(30 * np.pi / 180), np.sin(30 * np.pi / 180), 0, 0]
 )
-qy = quaternion.from_float_array(
+
+qy = np.quaternion.from_float_array(
     [np.cos(45 * np.pi / 180), 0, np.sin(45 * np.pi / 180), 0]
 )
 
@@ -45,7 +46,7 @@ rotated_points = []
 
 for u in range(len(u_values)):
     for v in range(len(v_values)):
-        q = quaternion.quaternion(*spherical_coordinates(u, v)) * qx * qy
+        q = np.quaternion(*spherical_coordinates(u, v)) * qx * qy
         rotated_point = np.array(
             [q[1], q[2], q[3]]
         )  # Assuming the real part is at index
