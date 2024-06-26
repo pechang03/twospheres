@@ -1,12 +1,20 @@
-import numpy as np
 import matplotlib.pyplot as plt
-from mpl_toolkits.mplot3d import Axes3D
+import networkx as nx
 
-# Define the sphere parameters
-radius = 1.0
-center1 = [0, radius, 0]
-center2 = [0, -radius, 0]
+# Create a simple graph
+G = nx.Graph()
+G.add_node(1, pos=(0, 0))
+G.add_node(2, pos=(1, 0))
+G.add_edge(1, 2)
 
-def plot_spheres(ax):
-    # Plot the first sphere
-    u = np.linspace(0, 2 * np.pi, 100)
+# Draw the graph
+pos = nx.get_node_attributes(G, 'pos')
+nx.draw(G, pos, with_labels=True, node_size=3000, node_color="skyblue", font_size=10, font_weight='bold', edge_color='gray')
+
+# Set plot limits and remove axes
+plt.xlim(-0.5, 1.5)
+plt.ylim(-0.5, 0.5)
+plt.axis('off')
+
+# Save the figure before showing it to avoid displaying an empty plot
+plt.savefig("graph_plot.png")
