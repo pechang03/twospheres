@@ -31,4 +31,6 @@ nx.draw_networkx_nodes(
     cmap=plt.cm.Reds_r,
 )
 
-plt.pos, ax=0.4)
+# Corrected line: plt.axis('off') -> plt.axis('off')
+plt.axis('off')
+plt.show()
