@@ -126,6 +126,50 @@ Fill channel before lens with liquid PDMS (n≈1.41):
 
 ---
 
+## Fabrication Constraints
+
+### Demolding Limit: Max 180° per Layer
+
+Soft lithography requires mold release — features cannot wrap >180°:
+
+```
+Can't make (single layer):     Can make:
+   ╭───────╮                      ╭───────╮
+  │  360°  │  ← mold trapped     │  180°  │  ← mold lifts out
+  │  ring  │                     │  half  │
+   ╰───────╯                      ╰───┬───╯
+                                     ↓ demolding direction
+```
+
+**Solutions for full rings:**
+1. **Two-layer bonding**: Top half + bottom half, plasma bond
+   - Alignment: ~5-10µm with 4-point fiducials + microscope
+   - PDMS is soft and sticky — one shot to place, no repositioning
+   - Much worse than <1µm single-layer lithography precision
+2. **Racetrack resonator**: Two 180° bends + straights (single layer, preferred)
+3. **Spiral entry**: Open ring with tangential waveguide entry
+4. **3D printing**: Direct-write for complex 3D (not soft lithography)
+
+**Design principle**: Keep critical features in single layer whenever possible.
+
+### Surface Roughness
+
+Typical PDMS from SU-8 mold:
+- RMS roughness: 10-100 nm
+- Correlation length: 0.5-5 µm
+- Scattering loss: ~0.1-1 dB/cm at NIR
+
+### Minimum Feature Sizes
+
+| Feature | Minimum | Notes |
+|---------|---------|-------|
+| Channel width | ~10 µm | Limited by photolithography |
+| Channel depth | ~5 µm | Aspect ratio <10:1 for demolding |
+| Radius of curvature | ~20 µm | Smaller = more roughness |
+| Gap (evanescent) | ~200 nm | Requires e-beam or interference litho |
+
+---
+
 ## Design Rules of Thumb
 
 1. **TIR mirrors** are lossless — prefer over metallic when geometry allows
@@ -135,3 +179,5 @@ Fill channel before lens with liquid PDMS (n≈1.41):
 5. **Glycerol fill** disables TIR elements (n > PDMS)
 6. **Liquid metal** for reconfigurable high-reflectivity mirrors
 7. **Account for thermal shift** in precision applications (~1%/12°C)
+8. **Max 180°** features per mold layer (demolding constraint)
+9. **Aspect ratio <10:1** for reliable demolding
