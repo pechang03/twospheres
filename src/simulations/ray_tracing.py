@@ -14,6 +14,7 @@ __all__ = ['RayTracer', 'PDMSLens', 'trace_parallel_beam', 'trace_point_source',
 # Material Library
 # =============================================================================
 
+# Refractive indices at 550nm (visible)
 MATERIAL_LIBRARY = {
     # Standard optical glasses
     'BK7': 1.5168,       # Borosilicate crown glass at 550nm
@@ -39,6 +40,52 @@ MATERIAL_LIBRARY = {
     'CYTOPLASM': 1.36,   # Typical cell cytoplasm
     'BRAIN_TISSUE': 1.37,  # Gray matter approximate
 }
+
+# NIR refractive indices (800-1000nm) - dispersion correction
+MATERIAL_LIBRARY_NIR = {
+    'BK7': 1.5108,       # ~0.4% lower at NIR
+    'N-BK7': 1.5108,
+    'SF11': 1.7720,
+    'FUSED_SILICA': 1.4533,
+    'PDMS': 1.403,       # PDMS at 900nm
+    'PDMS_800': 1.405,   # PDMS at 800nm
+    'PDMS_1000': 1.400,  # PDMS at 1000nm
+    'PDMS_CURED': 1.423,
+    'SU8': 1.583,
+    'PMMA': 1.484,
+    'WATER': 1.328,
+    'AIR': 1.0003,
+}
+
+
+def get_material_nir(name: str, wavelength_nm: float = 900) -> float:
+    """Get refractive index for a material at NIR wavelengths.
+    
+    Args:
+        name: Material name (case-insensitive)
+        wavelength_nm: Wavelength in nm (800-1000nm range)
+        
+    Returns:
+        Refractive index at specified wavelength
+    """
+    key = name.upper().replace('-', '_').replace(' ', '_')
+    
+    # Check NIR library first
+    if key in MATERIAL_LIBRARY_NIR:
+        base_n = MATERIAL_LIBRARY_NIR[key]
+    elif key in MATERIAL_LIBRARY:
+        # Apply approximate dispersion correction for NIR
+        base_n = MATERIAL_LIBRARY[key] * 0.995  # ~0.5% lower in NIR
+    else:
+        raise ValueError(f"Unknown material: {name}")
+    
+    # Fine wavelength adjustment for PDMS (main use case)
+    if 'PDMS' in key and key not in ['PDMS_800', 'PDMS_1000']:
+        # Linear interpolation: 1.405 at 800nm, 1.400 at 1000nm
+        if 800 <= wavelength_nm <= 1000:
+            base_n = 1.405 - (wavelength_nm - 800) * 0.005 / 200
+    
+    return base_n
 
 
 def get_material(name: str) -> float:
