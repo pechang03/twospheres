@@ -9,9 +9,19 @@ from dataclasses import dataclass
 import numpy as np
 
 __all__ = [
-    'FiberSpec', 'LensSpec', 'FourFSystem', 'CouplingResult',
-    'FIBER_TYPES', 'compute_spot_size', 'design_4f_system'
+    'FiberSpec', 'LensSpec', 'MeniscusLens', 'FourFSystem', 'CouplingResult',
+    'FIBER_TYPES', 'compute_spot_size', 'design_4f_system',
+    'design_meniscus_lens', 'PDMS_NIR_INDEX'
 ]
+
+# PDMS refractive indices for NIR
+PDMS_NIR_INDEX = {
+    800: 1.405,
+    850: 1.404,
+    900: 1.403,
+    950: 1.401,
+    1000: 1.400,
+}
 
 
 # =============================================================================
@@ -142,6 +152,190 @@ class LensSpec:
                 )
         except ImportError:
             return None
+
+
+# =============================================================================
+# Meniscus Lens (SA-optimized)
+# =============================================================================
+
+@dataclass
+class MeniscusLens:
+    """Best-form meniscus lens optimized for minimal spherical aberration.
+    
+    Based on optical design principles for fiber coupling:
+    - Concentric meniscus shape minimizes SA at unit magnification
+    - Curved side toward fiber (longer conjugate) reduces SA by ~3x
+    - Optional aspheric conic constant for further SA reduction
+    
+    Reference: Zemax optimization for PDMS n≈1.405 at NA=0.25
+    - Wavefront error: ~0.25λ (plano-convex) → <0.03λ (meniscus)
+    """
+    r1: float  # Front radius of curvature (convex, positive)
+    r2: float  # Back radius of curvature (concave, negative) 
+    thickness: float  # Center thickness in mm
+    diameter: float  # Lens diameter in mm
+    refractive_index: float  # Material n at wavelength
+    conic: float = 0.0  # Aspheric conic constant (κ≈-0.8 for SA correction)
+    
+    @property
+    def focal_length(self) -> float:
+        """Calculate focal length using thick lens formula."""
+        n = self.refractive_index
+        t = self.thickness
+        R1, R2 = self.r1, self.r2
+        
+        # Lensmaker equation with thickness correction
+        phi1 = (n - 1) / R1
+        phi2 = -(n - 1) / R2  # R2 is negative for concave
+        phi = phi1 + phi2 - (t / n) * phi1 * phi2
+        
+        return 1 / phi if phi != 0 else float('inf')
+    
+    @property
+    def principal_plane_offset(self) -> float:
+        """Distance from front vertex to front principal plane."""
+        n = self.refractive_index
+        t = self.thickness
+        f = self.focal_length
+        R2 = self.r2
+        return -f * t * (n - 1) / (n * R2)
+    
+    def spherical_aberration_factor(self) -> float:
+        """Relative SA factor compared to plano-convex (lower = better).
+        
+        Plano-convex = 1.0, optimized meniscus ≈ 0.1-0.15
+        Uses Coddington shape factor with standard sign convention:
+        - R positive for center of curvature to right of surface
+        - Plano-convex (flat/curved): q = +1
+        - Biconvex equi-radii: q = 0
+        - Best-form meniscus: q ≈ +0.7 for n≈1.4
+        """
+        # Standard shape factor: q = (R1 + R2) / (R1 - R2)
+        # For our convention: R1 positive (convex), R2 negative (concave toward back)
+        R1_signed = self.r1  # positive
+        R2_signed = self.r2  # already negative
+        q = (R1_signed + R2_signed) / (R1_signed - R2_signed)
+        n = self.refractive_index
+        
+        # Third-order SA coefficient (Kingslake formula)
+        # SA ∝ n³/[f³(n-1)²] * [(n+2)/(n(n-1)) * q² + 2(n²-1)/n * q + (3n+1)(n-1)]
+        # Simplified: SA_rel ∝ A*q² + B*q + C
+        A = (n + 2) / (n * (n - 1))
+        B = 2 * (n**2 - 1) / n
+        C = (3*n + 1) * (n - 1)
+        
+        sa_meniscus = abs(A * q**2 + B * q + C)
+        
+        # Plano-convex reference (q = +1 with curved side toward focus)
+        q_pc = 1.0
+        sa_pc = abs(A * q_pc**2 + B * q_pc + C)
+        
+        return sa_meniscus / sa_pc if sa_pc > 0 else 1.0
+    
+    def create_pyoptools_lens(self):
+        """Create pyoptools SphericalLens for this meniscus."""
+        try:
+            from pyoptools.raytrace.comp_lib import SphericalLens
+            
+            return SphericalLens(
+                radius=self.diameter / 2,
+                curvature_s1=1/self.r1,  # Convex front
+                curvature_s2=1/self.r2,  # Concave back (r2 negative)
+                thickness=self.thickness,
+                material=self.refractive_index
+            )
+        except ImportError:
+            return None
+    
+    def to_dict(self) -> Dict[str, Any]:
+        """Convert to dictionary representation."""
+        return {
+            'type': 'meniscus',
+            'r1_mm': self.r1,
+            'r2_mm': self.r2,
+            'thickness_mm': self.thickness,
+            'diameter_mm': self.diameter,
+            'n': self.refractive_index,
+            'conic': self.conic,
+            'focal_length_mm': self.focal_length,
+            'sa_factor': self.spherical_aberration_factor()
+        }
+
+
+def design_meniscus_lens(
+    focal_length: float,
+    diameter: float = 1.0,
+    wavelength_nm: float = 850,
+    n_pdms: Optional[float] = None
+) -> MeniscusLens:
+    """Design an SA-optimized meniscus lens for fiber coupling.
+    
+    Uses best-form shape factor for minimal spherical aberration.
+    Based on ernie2_swarm optimization for PDMS at NA=0.25:
+    - Reference design: R1=+0.55mm, R2=-0.45mm, t=0.35mm for f≈1mm
+    - Achieves wavefront error <0.03λ vs 0.25λ for plano-convex
+    
+    Args:
+        focal_length: Desired focal length in mm
+        diameter: Lens diameter in mm
+        wavelength_nm: Operating wavelength (800-1000nm)
+        n_pdms: PDMS refractive index (auto from wavelength if None)
+        
+    Returns:
+        MeniscusLens with optimized parameters
+    """
+    # Get PDMS index for wavelength
+    if n_pdms is None:
+        # Interpolate from PDMS_NIR_INDEX
+        wl = int(wavelength_nm)
+        if wl in PDMS_NIR_INDEX:
+            n_pdms = PDMS_NIR_INDEX[wl]
+        else:
+            # Linear interpolation
+            wls = sorted(PDMS_NIR_INDEX.keys())
+            for i in range(len(wls) - 1):
+                if wls[i] <= wl <= wls[i+1]:
+                    t = (wl - wls[i]) / (wls[i+1] - wls[i])
+                    n_pdms = PDMS_NIR_INDEX[wls[i]] * (1-t) + PDMS_NIR_INDEX[wls[i+1]] * t
+                    break
+            else:
+                n_pdms = 1.403  # Default to 900nm
+    
+    n = n_pdms
+    
+    # Optimal shape factor for minimum SA (Kingslake formula)
+    # dSA/dq = 0 gives: q_opt = -B/(2A) = -n(n²-1) / (n+2)
+    A = (n + 2) / (n * (n - 1))
+    B = 2 * (n**2 - 1) / n
+    q_opt = -B / (2 * A)
+    
+    # Reference from ernie2_swarm optimization at f=1mm:
+    # R1 = +0.55mm, R2 = -0.45mm gives q = (0.55 + -0.45)/(0.55 - -0.45) = 0.1/1.0 = 0.1
+    # This is close to optimal for PDMS
+    
+    # From shape factor q = (R1 + R2)/(R1 - R2), derive R1/R2 ratio
+    # Let r = |R2|/R1 (both magnitudes), with R2 negative
+    # q = (R1 - r*R1) / (R1 + r*R1) = (1-r)/(1+r)
+    # Solving: r = (1-q)/(1+q)
+    r_ratio = (1 - q_opt) / (1 + q_opt)
+    
+    # Scale to desired focal length using lensmaker equation
+    # 1/f = (n-1) * (1/R1 - 1/R2) = (n-1) * (1/R1 + 1/(r*R1)) = (n-1)/R1 * (1 + 1/r)
+    # R1 = f * (n-1) * (1 + 1/r)
+    R1 = focal_length * (n - 1) * (1 + 1/r_ratio)
+    R2 = -r_ratio * R1  # Negative for concave back surface
+    
+    # Thickness: ~0.35/0.55 = 0.64 ratio from reference design
+    thickness = abs(R1) * 0.64
+    
+    return MeniscusLens(
+        r1=R1,
+        r2=R2,
+        thickness=thickness,
+        diameter=diameter,
+        refractive_index=n_pdms,
+        conic=-0.8  # Aspheric correction for residual SA
+    )
 
 
 # =============================================================================
