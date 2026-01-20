@@ -1,0 +1,36 @@
+# Configuration schema for TwoSphere-MCP service layer
+#
+# This YAML schema defines the valid ranges and types for all service
+# configuration parameters. Path can be overridden with ENV var
+# `LOCIMO_SERVICES_CONFIG`.
+#
+# All services (LOCSimulator, SensingService, MRIAnalysisOrchestrator)
+# consume this schema for parameter validation.
+
+wavelength_nm:
+  type: float
+  min: 300
+  max: 1100
+  unit: nm
+  description: Vacuum wavelength for optical system
+
+na_objective:
+  type: float
+  min: 0.1
+  max: 1.45
+  unit: dimensionless
+  description: Numerical aperture of microscope objective
+
+pixel_size_um:
+  type: float
+  min: 0.5
+  max: 50
+  unit: µm
+  description: Camera pixel pitch (physical size)
+
+dark_signal_e:
+  type: float
+  min: 0
+  max: 1000
+  unit: electrons
+  description: Average dark signal per pixel
