@@ -377,6 +377,110 @@ async def list_tools() -> List[Tool]:
                 "required": ["time", "intensity"]
             }
         ),
+        Tool(
+            name="alignment_sensitivity_monte_carlo",
+            description="Monte Carlo simulation of fiber-chip alignment tolerance. "
+                       "Computes coupling efficiency statistics under fabrication variations.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "wavelength_nm": {
+                        "type": "number",
+                        "description": "Operating wavelength in nm (default: 1550)",
+                        "default": 1550
+                    },
+                    "fiber_mfd_um": {
+                        "type": "number",
+                        "description": "Fiber mode field diameter in µm (default: 10.4)",
+                        "default": 10.4
+                    },
+                    "spot_size_um": {
+                        "type": "number",
+                        "description": "Waveguide spot size in µm (default: 3.0)",
+                        "default": 3.0
+                    },
+                    "lateral_tolerance_um": {
+                        "type": "number",
+                        "description": "Lateral tolerance ±3σ in µm (default: 1.0)",
+                        "default": 1.0
+                    },
+                    "angular_tolerance_deg": {
+                        "type": "number",
+                        "description": "Angular tolerance ±3σ in degrees (default: 0.5)",
+                        "default": 0.5
+                    },
+                    "n_samples": {
+                        "type": "integer",
+                        "description": "Number of Monte Carlo samples (default: 10000)",
+                        "default": 10000
+                    }
+                },
+                "required": []
+            }
+        ),
+        Tool(
+            name="whole_brain_network_analysis",
+            description="Complete whole-brain functional connectivity analysis from fMRI time-series. "
+                       "Computes connectivity matrix, constructs network, and analyzes graph metrics.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "region_labels": {
+                        "type": "array",
+                        "items": {"type": "string"},
+                        "description": "List of brain region names (e.g., ['V1_L', 'V1_R', 'V4_L', 'V4_R'])"
+                    },
+                    "connectivity_method": {
+                        "type": "string",
+                        "description": "Connectivity estimation method",
+                        "enum": ["distance_correlation", "fft_correlation", "phase_locking"],
+                        "default": "distance_correlation"
+                    },
+                    "network_density": {
+                        "type": "number",
+                        "description": "Target network edge density 0-1 (default: 0.15)",
+                        "default": 0.15
+                    },
+                    "n_timepoints": {
+                        "type": "integer",
+                        "description": "Number of time points in synthetic signals (default: 400)",
+                        "default": 400
+                    }
+                },
+                "required": ["region_labels"]
+            }
+        ),
+        Tool(
+            name="multi_organ_ooc_simulation",
+            description="Simulate multi-organ OOC pharmacokinetics and biomarker transport. "
+                       "Models drug/biomarker distribution across interconnected organ chambers.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "system_type": {
+                        "type": "string",
+                        "description": "Predefined OOC system configuration",
+                        "enum": ["liver_kidney", "tumor_metastasis"],
+                        "default": "liver_kidney"
+                    },
+                    "source_organ": {
+                        "type": "string",
+                        "description": "Organ producing biomarker (for biomarker simulation)"
+                    },
+                    "production_rate": {
+                        "type": "number",
+                        "description": "Biomarker production rate in µM/min (default: 1.0)",
+                        "default": 1.0
+                    },
+                    "simulation_time_min": {
+                        "type": "number",
+                        "description": "Simulation time in minutes (default: 60)",
+                        "default": 60.0
+                    }
+                },
+                "required": ["system_type"]
+            }
+        ),
     ]
 
 
@@ -408,6 +512,12 @@ async def call_tool(name: str, arguments: Dict[str, Any]) -> List[TextContent]:
             result = await handle_absorption_spectroscopy(arguments)
         elif name == "cavity_ringdown_spectroscopy":
             result = await handle_cavity_ringdown_spectroscopy(arguments)
+        elif name == "alignment_sensitivity_monte_carlo":
+            result = await handle_alignment_sensitivity_monte_carlo(arguments)
+        elif name == "whole_brain_network_analysis":
+            result = await handle_whole_brain_network_analysis(arguments)
+        elif name == "multi_organ_ooc_simulation":
+            result = await handle_multi_organ_ooc_simulation(arguments)
         else:
             result = {"error": f"Unknown tool: {name}"}
 
@@ -961,6 +1071,138 @@ async def handle_cavity_ringdown_spectroscopy(args: Dict[str, Any]) -> Dict[str,
 
     except Exception as e:
         return {"error": str(e), "tool": "cavity_ringdown_spectroscopy"}
+
+
+async def handle_alignment_sensitivity_monte_carlo(args: Dict[str, Any]) -> Dict[str, Any]:
+    """Monte Carlo simulation of alignment tolerance for fiber-chip coupling."""
+    try:
+        sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
+        from backend.optics.alignment_sensitivity import (
+            AlignmentSensitivityAnalyzer,
+            AlignmentToleranceSpec
+        )
+
+        # Extract arguments
+        wavelength_nm = args.get("wavelength_nm", 1550)
+        fiber_mfd_um = args.get("fiber_mfd_um", 10.4)
+        spot_size_um = args.get("spot_size_um", 3.0)
+        lateral_tol = args.get("lateral_tolerance_um", 1.0)
+        angular_tol = args.get("angular_tolerance_deg", 0.5)
+        n_samples = args.get("n_samples", 10000)
+
+        # Initialize analyzer
+        analyzer = AlignmentSensitivityAnalyzer(
+            wavelength_nm=wavelength_nm,
+            fiber_mfd_um=fiber_mfd_um,
+            spot_size_um=spot_size_um
+        )
+
+        # Define tolerance spec
+        tolerance_spec = AlignmentToleranceSpec(
+            lateral_tolerance_um=lateral_tol,
+            angular_tolerance_deg=angular_tol
+        )
+
+        # Run Monte Carlo simulation
+        mc_results = await analyzer.run_monte_carlo(
+            tolerance_spec,
+            n_samples=n_samples
+        )
+
+        return mc_results
+
+    except Exception as e:
+        return {"error": str(e), "tool": "alignment_sensitivity_monte_carlo"}
+
+
+async def handle_whole_brain_network_analysis(args: Dict[str, Any]) -> Dict[str, Any]:
+    """Whole-brain functional connectivity network analysis."""
+    try:
+        sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
+        from backend.mri.whole_brain_network import WholeBrainNetworkAnalyzer
+        import numpy as np
+
+        # Extract arguments
+        region_labels = args["region_labels"]
+        connectivity_method = args.get("connectivity_method", "distance_correlation")
+        network_density = args.get("network_density", 0.15)
+        n_timepoints = args.get("n_timepoints", 400)
+
+        # Initialize analyzer
+        analyzer = WholeBrainNetworkAnalyzer(
+            region_labels=region_labels,
+            sampling_rate_hz=0.5,
+            connectivity_method=connectivity_method
+        )
+
+        # Generate synthetic fMRI signals (for demonstration)
+        # In production, user would provide actual fMRI data
+        np.random.seed(42)
+        n_regions = len(region_labels)
+
+        # Create correlated signals (simulate functional connectivity)
+        shared_signal = np.sin(2 * np.pi * 0.01 * np.arange(n_timepoints))  # Slow oscillation
+        time_series = []
+        for i in range(n_regions):
+            # Each region gets shared signal + noise + unique component
+            region_signal = (
+                0.5 * shared_signal +
+                0.3 * np.sin(2 * np.pi * (0.01 + i * 0.005) * np.arange(n_timepoints)) +
+                0.2 * np.random.randn(n_timepoints)
+            )
+            time_series.append(region_signal)
+
+        # Run complete analysis
+        results = await analyzer.run_complete_analysis(
+            time_series,
+            network_density=network_density
+        )
+
+        return results
+
+    except Exception as e:
+        return {"error": str(e), "tool": "whole_brain_network_analysis"}
+
+
+async def handle_multi_organ_ooc_simulation(args: Dict[str, Any]) -> Dict[str, Any]:
+    """Multi-organ OOC pharmacokinetics simulation."""
+    try:
+        sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
+        from backend.services.multi_organ_ooc import (
+            MultiOrganOOC,
+            create_liver_kidney_system,
+            create_tumor_metastasis_system
+        )
+
+        # Extract arguments
+        system_type = args["system_type"]
+        source_organ = args.get("source_organ")
+        production_rate = args.get("production_rate", 1.0)
+        simulation_time_min = args.get("simulation_time_min", 60.0)
+
+        # Create OOC system
+        if system_type == "liver_kidney":
+            ooc_system = create_liver_kidney_system()
+            if source_organ is None:
+                source_organ = "liver"
+        elif system_type == "tumor_metastasis":
+            ooc_system = create_tumor_metastasis_system()
+            if source_organ is None:
+                source_organ = "tumor"
+        else:
+            return {"error": f"Unknown system_type: {system_type}"}
+
+        # Run biomarker transfer simulation
+        results = await ooc_system.compute_biomarker_transfer(
+            source_organ=source_organ,
+            biomarker_production_rate=production_rate,
+            simulation_time_min=simulation_time_min
+        )
+
+        return results
+
+    except Exception as e:
+        return {"error": str(e), "tool": "multi_organ_ooc_simulation"}
 
 
 # =============================================================================
