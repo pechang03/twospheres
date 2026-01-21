@@ -184,7 +184,7 @@ class TestPRIMEDELoaderAPI:
         with patch.object(loader.client, "post", new_callable=AsyncMock) as mock_post:
             # Create async mock for json()
             mock_resp = AsyncMock()
-            mock_resp.json = AsyncMock(return_value=mock_response)
+            mock_resp.json = MagicMock(return_value=mock_response)
             mock_resp.raise_for_status = MagicMock()
             mock_post.return_value = mock_resp
 
@@ -227,7 +227,7 @@ class TestPRIMEDELoaderAPI:
 
         with patch.object(loader.client, "post", new_callable=AsyncMock) as mock_post:
             mock_resp = AsyncMock()
-            mock_resp.json = AsyncMock(return_value=mock_response)
+            mock_resp.json = MagicMock(return_value=mock_response)  # json() is NOT async in httpx
             mock_resp.raise_for_status = MagicMock()
             mock_post.return_value = mock_resp
 
@@ -263,7 +263,7 @@ class TestPRIMEDELoaderDataLoading:
             with patch("src.backend.data.prime_de_loader.nib") as mock_nib:
                 with patch("pathlib.Path.exists", return_value=True):
                     mock_resp = AsyncMock()
-                    mock_resp.json = AsyncMock(return_value=mock_api_response)
+                    mock_resp.json = MagicMock(return_value=mock_api_response)
                     mock_resp.raise_for_status = MagicMock()
                     mock_post.return_value = mock_resp
 
@@ -298,7 +298,7 @@ class TestPRIMEDELoaderDataLoading:
         with patch.object(loader.client, "post", new_callable=AsyncMock) as mock_post:
             with patch("pathlib.Path.exists", return_value=False):
                 mock_resp = AsyncMock()
-                mock_resp.json = AsyncMock(return_value=mock_api_response)
+                mock_resp.json = MagicMock(return_value=mock_api_response)
                 mock_resp.raise_for_status = MagicMock()
                 mock_post.return_value = mock_resp
 
@@ -413,7 +413,7 @@ class TestIntegration:
             with patch("src.backend.data.prime_de_loader.nib") as mock_nib:
                 with patch("pathlib.Path.exists", return_value=True):
                     mock_resp = AsyncMock()
-                    mock_resp.json = AsyncMock(return_value=mock_api_response)
+                    mock_resp.json = MagicMock(return_value=mock_api_response)
                     mock_resp.raise_for_status = MagicMock()
                     mock_post.return_value = mock_resp
 
@@ -444,7 +444,7 @@ class TestIntegration:
         # Create mock responses for each subject
         def create_mock_resp(subject_id):
             resp = AsyncMock()
-            resp.json = AsyncMock(return_value={
+            resp.json = MagicMock(return_value={
                 "result": {
                     "path": f"/tmp/{subject_id}_bold.nii.gz",
                     "dataset": "BORDEAUX24",
@@ -551,7 +551,7 @@ class TestEdgeCases:
 
         with patch.object(loader.client, "post", new_callable=AsyncMock) as mock_post:
             mock_resp = AsyncMock()
-            mock_resp.json = AsyncMock(return_value=mock_response)
+            mock_resp.json = MagicMock(return_value=mock_response)
             mock_resp.raise_for_status = MagicMock()
             mock_post.return_value = mock_resp
 
@@ -562,12 +562,15 @@ class TestEdgeCases:
         """Test atlas extraction when data is minimal."""
         atlas = D99Atlas()
 
-        # Minimal data: one voxel
+        # Minimal data: one voxel with value 1.0
         nifti_data = np.ones((1, 1, 1, 50), dtype=np.float32)
         timeseries = atlas.extract_timeseries(nifti_data)
 
         assert timeseries.shape == (50, 368)
-        assert np.allclose(timeseries, 1.0)
+        # With 1 voxel and 368 regions, only the first region gets the voxel
+        # First region should have value 1.0, rest should be 0.0
+        assert np.allclose(timeseries[:, 0], 1.0)  # First region has the voxel
+        assert np.allclose(timeseries[:, 1:], 0.0)  # Rest are empty (filled with 0)
 
     @pytest.mark.asyncio
     async def test_connectivity_single_region(self):

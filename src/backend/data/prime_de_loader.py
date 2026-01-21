@@ -118,7 +118,11 @@ class D99Atlas:
             region_voxels = data_2d[voxel_idx:voxel_idx + region_size, :]
 
             # Compute mean across voxels in region
-            timeseries[:, region_idx] = np.mean(region_voxels, axis=0)
+            # Handle edge case: if region is empty (size=0), fill with 0.0
+            if region_size > 0:
+                timeseries[:, region_idx] = np.mean(region_voxels, axis=0)
+            else:
+                timeseries[:, region_idx] = 0.0
             voxel_idx += region_size
 
         return timeseries

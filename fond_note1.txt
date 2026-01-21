@@ -1,0 +1,78 @@
+22 Jan 2026 ernie2_swarm
+Engram] amem_e_service available at http://localhost:8091
+[Tensor] Routed to Tensor[LLM, F2, code]
+[Tensor] Domain: code, F_i: F2
+[Tensor] Available tools: 7
+[Engram] Cached result (0 n-grams indexed)
+Fractal geometry gives you a way to generate the “wrinkle‐pattern” that is the folded neocortex, while keeping a mathematically clean one-to-one correspondence (a homeomorphism) between the inner white-matter hull and the outer pial hull.  
+The key is to treat the pial surface as a small-amplitude, single-valued radial displacement of the white-matter sphere:
+
+  **Pial radius**: R(θ, φ) = R<sub>WM</sub> + ε·f(θ, φ), with 0 < ε ≪ 1, f:ℝ²→ℝ, |f|≤1.
+
+All topological preservation is guaranteed automatically because every (θ,φ) on the sphere still maps to exactly one point on the inner surface and one on the outer surface; no folds touch each other (no self-intersections) as long as ε is smaller than the minimum local radius of curvature of the sphere divided by the maximum Laplacian of f.
+
+Below is a concrete implementation that uses a Mandelbrot/Julia style **complex iterated map on the sphere** to generate the fractal displacement f(θ,φ).  The same pipeline works for L-systems or Perlin-style noise by replacing the fractal-evaluation step.
+
+--------------------------------------------------
+1.  Choose a complex structure on the sphere
+--------------------------------------------------
+Stereographically map the sphere (minus the north pole) to the complex plane:
+
+  z = tan(θ/2) e^{iφ},  θ∈[0,π), φ∈[0,2π).
+
+Any classic complex fractal iteration is now well-defined.
+
+--------------------------------------------------
+2.  Build a fractal height-field on ℂ
+--------------------------------------------------
+Pick a quadratic Julia set with parameter c (or the Mandelbrot set).  
+For each z we iterate:
+
+  z<sub>0</sub> = z  
+  z<sub>n+1</sub> = z<sub>n</sub>² + c  (max 100–200 iterations)
+
+and compute the **smooth potential** (Douady–Hubbard):
+
+  n = first iteration with |z<sub>n</sub>| > 2  
+  pot = n − log₂ log |z<sub>n</sub>|.
+
+Normalize pot to [0,1] over the domain of interest:
+
+  f<sub>ℂ</sub>(z) = (pot − pot<sub>min</sub>)/(pot<sub>max</sub> − pot<sub>min</sub>).
+
+--------------------------------------------------
+3.  Lift the height-field back to the sphere
+--------------------------------------------------
+Inverse stereographic projection gives the spherical displacement:
+
+  f(θ,φ) = f<sub>ℂ</sub>( tan(θ/2) e^{iφ} ).
+
+Because the projection is conformal, gyral ridges automatically meet at the same angles as in the planar fractal, preserving the self-similar statistical scaling observed in real cortical folds (D ≈ 2.2–2.4).
+
+--------------------------------------------------
+4.  Guarantee no self-intersections
+--------------------------------------------------
+Compute the maximum Laplacian on the sphere:
+
+  Δ<sub>S²</sub>f = 4(1+|z|²)² |∂<sub>z̄</sub>f|<sup>2</sup>/(1+|z|²)² + curvature terms.
+
+The C<sup>0</sup>–C<sup>2</sup> bound is
+
+  ε<sub>max</sub> = 1 / ( max|Δ<sub>S²</sub>f| + max|∇f|² ).
+
+Keep ε < ε<sub>max</sub> and the surface stays embedded.
+
+--------------------------------------------------
+5.  Mesh generation and white-matter–pial correspondence
+--------------------------------------------------
+–  Start with a regular icosphere subdivided k times (~10<sup>5</sup> vertices).  
+–  Store each vertex position v<sub>WM</sub> on the unit sphere.  
+–  Evaluate f(θ,φ) at the same (θ,φ).  
+–  Pial vertex: v<sub>Pial</sub> = (1 + ε f)v<sub>WM</sub>.
+
+The identity map v<sub>WM</sub>↦v<sub>Pial</sub> is the required homeomorphism; fibre tracts can later be drawn as straight radial lines in this coordinate frame.
+
+--------------------------------------------------
+6.  Adaptation to L-systems (outline)
+--------------------------------------------------
+Instead of a Julia potential, generate a branching pattern on the sphere with an L-system whose production rules are rotated by the local frame (θ,φ).  Rasterise the resulting fibre structure into a spherical texture and blur it to obtain f(θ,φ); then proceed with steps 4–5.

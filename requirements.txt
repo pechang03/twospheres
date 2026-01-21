@@ -3,6 +3,7 @@ numpy>=1.24.0
 scipy>=1.10.0
 matplotlib>=3.7.0
 networkx>=3.0         # Graph analysis for brain connectivity networks
+numpy-quaternion>=2022.4.3  # Quaternion rotations for sphere mapping
 
 # Optical simulation
 pyoptools>=0.3.7
