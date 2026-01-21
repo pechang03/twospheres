@@ -231,6 +231,152 @@ async def list_tools() -> List[Tool]:
                 "required": []
             }
         ),
+        Tool(
+            name="interferometric_sensing",
+            description="Fit interference pattern and compute visibility for biosensing. "
+                       "Uses lmfit for automatic uncertainty propagation. Returns visibility V = A/(A + 2*C₀) "
+                       "and refractive index shift from phase measurements.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "position": {
+                        "type": "array",
+                        "items": {"type": "number"},
+                        "description": "Spatial position or time coordinate (N points)"
+                    },
+                    "intensity": {
+                        "type": "array",
+                        "items": {"type": "number"},
+                        "description": "Measured intensity values (N points)"
+                    },
+                    "wavelength_nm": {
+                        "type": "number",
+                        "description": "Operating wavelength in nm (default: 633)",
+                        "default": 633
+                    },
+                    "path_length_mm": {
+                        "type": "number",
+                        "description": "Interferometer path length difference in mm (default: 10)",
+                        "default": 10
+                    },
+                    "compute_delta_n": {
+                        "type": "boolean",
+                        "description": "Compute refractive index shift from visibility change (default: false)",
+                        "default": False
+                    },
+                    "visibility_baseline": {
+                        "type": "number",
+                        "description": "Baseline visibility for Δn computation (required if compute_delta_n=true)"
+                    }
+                },
+                "required": ["position", "intensity"]
+            }
+        ),
+        Tool(
+            name="lock_in_detection",
+            description="Digital lock-in amplification for phase-sensitive detection. "
+                       "Extracts signals buried in noise by correlating with reference frequency. "
+                       "Returns I/Q channels, amplitude, and phase.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "signal": {
+                        "type": "array",
+                        "items": {"type": "number"},
+                        "description": "Input signal to demodulate (N points)"
+                    },
+                    "time": {
+                        "type": "array",
+                        "items": {"type": "number"},
+                        "description": "Time vector in seconds (N points)"
+                    },
+                    "reference_frequency": {
+                        "type": "number",
+                        "description": "Reference frequency in Hz"
+                    },
+                    "time_constant": {
+                        "type": "number",
+                        "description": "Low-pass filter time constant in seconds (default: 1.0)",
+                        "default": 1.0
+                    },
+                    "compute_error_signal": {
+                        "type": "boolean",
+                        "description": "Compute phase error signal for feedback control (default: false)",
+                        "default": False
+                    },
+                    "setpoint_phase": {
+                        "type": "number",
+                        "description": "Target phase in radians for error signal (default: 0.0)",
+                        "default": 0.0
+                    }
+                },
+                "required": ["signal", "time", "reference_frequency"]
+            }
+        ),
+        Tool(
+            name="absorption_spectroscopy",
+            description="Measure analyte concentration via Beer-Lambert law: A = ε·c·L. "
+                       "Fits transmission spectrum to determine concentration with uncertainty.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "wavelength": {
+                        "type": "array",
+                        "items": {"type": "number"},
+                        "description": "Wavelength array in nm (N points)"
+                    },
+                    "transmission": {
+                        "type": "array",
+                        "items": {"type": "number"},
+                        "description": "Transmission spectrum (0 to 1, N points)"
+                    },
+                    "path_length_cm": {
+                        "type": "number",
+                        "description": "Optical path length in cm (default: 1.0)",
+                        "default": 1.0
+                    },
+                    "extinction_coefficient": {
+                        "type": "number",
+                        "description": "Molar extinction coefficient ε in M⁻¹cm⁻¹ (if known)"
+                    },
+                    "reference_wavelength": {
+                        "type": "number",
+                        "description": "Wavelength for concentration measurement in nm (default: peak absorption)"
+                    }
+                },
+                "required": ["wavelength", "transmission"]
+            }
+        ),
+        Tool(
+            name="cavity_ringdown_spectroscopy",
+            description="Ultra-sensitive trace gas detection via cavity ringdown time measurement. "
+                       "Fits exponential decay to determine absorption coefficient α = (1/τ - 1/τ₀)·(c/2L).",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "time": {
+                        "type": "array",
+                        "items": {"type": "number"},
+                        "description": "Time array in microseconds (N points)"
+                    },
+                    "intensity": {
+                        "type": "array",
+                        "items": {"type": "number"},
+                        "description": "Cavity intensity decay (N points)"
+                    },
+                    "cavity_length_cm": {
+                        "type": "number",
+                        "description": "Cavity length in cm (default: 50)",
+                        "default": 50
+                    },
+                    "baseline_ringdown_us": {
+                        "type": "number",
+                        "description": "Baseline (empty cavity) ringdown time in μs"
+                    }
+                },
+                "required": ["time", "intensity"]
+            }
+        ),
     ]
 
 
@@ -254,11 +400,19 @@ async def call_tool(name: str, arguments: Dict[str, Any]) -> List[TextContent]:
             result = await handle_wavefront_analysis(arguments)
         elif name == "list_twosphere_files":
             result = await handle_list_files(arguments)
+        elif name == "interferometric_sensing":
+            result = await handle_interferometric_sensing(arguments)
+        elif name == "lock_in_detection":
+            result = await handle_lock_in_detection(arguments)
+        elif name == "absorption_spectroscopy":
+            result = await handle_absorption_spectroscopy(arguments)
+        elif name == "cavity_ringdown_spectroscopy":
+            result = await handle_cavity_ringdown_spectroscopy(arguments)
         else:
             result = {"error": f"Unknown tool: {name}"}
-        
+
         return [TextContent(type="text", text=json.dumps(result, indent=2))]
-    
+
     except Exception as e:
         return [TextContent(type="text", text=json.dumps({"error": str(e)}))]
 
@@ -559,6 +713,254 @@ async def handle_list_files(args: Dict[str, Any]) -> Dict[str, Any]:
         "files": file_info,
         "count": len(file_info)
     }
+
+
+async def handle_interferometric_sensing(args: Dict[str, Any]) -> Dict[str, Any]:
+    """Perform interferometric visibility analysis for biosensing."""
+    try:
+        sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
+        from backend.services.sensing_service import InterferometricSensor
+        import numpy as np
+
+        # Extract arguments
+        position = np.array(args["position"])
+        intensity = np.array(args["intensity"])
+        wavelength_nm = args.get("wavelength_nm", 633)
+        path_length_mm = args.get("path_length_mm", 10)
+        compute_delta_n = args.get("compute_delta_n", False)
+        visibility_baseline = args.get("visibility_baseline")
+
+        # Create sensor configuration
+        config = {
+            "wavelength_nm": wavelength_nm,
+            "path_length_mm": path_length_mm,
+            "refractive_index_sensitivity": 1e-6
+        }
+
+        # Initialize sensor and fit visibility
+        sensor = InterferometricSensor(config)
+        visibility, visibility_stderr, fit_params = await sensor.fit_visibility(
+            position, intensity
+        )
+
+        result = {
+            "visibility": float(visibility),
+            "visibility_uncertainty": float(visibility_stderr),
+            "amplitude": float(fit_params["amplitude"]),
+            "background": float(fit_params["background"]),
+            "phase_rad": float(fit_params["phase"]),
+            "period": float(fit_params["period"]),
+            "chi_square": float(fit_params["chi_square"]),
+            "reduced_chi_square": float(fit_params["reduced_chi_square"]),
+            "r_squared": float(fit_params["r_squared"]),
+            "num_data_points": len(position),
+            "wavelength_nm": wavelength_nm,
+            "path_length_mm": path_length_mm
+        }
+
+        # Optionally compute refractive index shift
+        if compute_delta_n and visibility_baseline is not None:
+            delta_n, delta_n_stderr = await sensor.compute_refractive_index_shift(
+                visibility_baseline, visibility, visibility_stderr
+            )
+            result["delta_n"] = float(delta_n)
+            result["delta_n_uncertainty"] = float(delta_n_stderr)
+            result["visibility_baseline"] = float(visibility_baseline)
+
+        return result
+
+    except Exception as e:
+        return {"error": str(e), "tool": "interferometric_sensing"}
+
+
+async def handle_lock_in_detection(args: Dict[str, Any]) -> Dict[str, Any]:
+    """Perform digital lock-in amplification for phase-sensitive detection."""
+    try:
+        sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
+        from backend.optics.feedback_control import DigitalLockIn
+        import numpy as np
+
+        # Extract arguments
+        signal_in = np.array(args["signal"])
+        time = np.array(args["time"])
+        reference_frequency = args["reference_frequency"]
+        time_constant = args.get("time_constant", 1.0)
+        compute_error_signal = args.get("compute_error_signal", False)
+        setpoint_phase = args.get("setpoint_phase", 0.0)
+
+        # Compute sampling rate from time vector
+        if len(time) > 1:
+            dt = np.mean(np.diff(time))
+            sampling_rate = 1.0 / dt
+        else:
+            return {"error": "Time vector must have at least 2 points"}
+
+        # Initialize lock-in amplifier
+        lock_in = DigitalLockIn(reference_frequency, sampling_rate, time_constant)
+
+        # Perform demodulation
+        i_component, q_component, amplitude, phase = lock_in.demodulate(signal_in, time)
+
+        result = {
+            "i_mean": float(np.mean(i_component)),
+            "q_mean": float(np.mean(q_component)),
+            "amplitude_mean": float(np.mean(amplitude)),
+            "phase_mean_rad": float(np.mean(phase)),
+            "amplitude_std": float(np.std(amplitude)),
+            "phase_std_rad": float(np.std(phase)),
+            "reference_frequency_hz": reference_frequency,
+            "sampling_rate_hz": sampling_rate,
+            "time_constant_s": time_constant,
+            "num_samples": len(signal_in),
+            "noise_bandwidth_hz": 1.0 / (4 * time_constant)
+        }
+
+        # Optionally compute error signal for feedback
+        if compute_error_signal:
+            error_signal = lock_in.compute_error_signal(signal_in, time, setpoint_phase)
+            result["error_signal_mean_rad"] = float(np.mean(error_signal))
+            result["error_signal_std_rad"] = float(np.std(error_signal))
+            result["setpoint_phase_rad"] = float(setpoint_phase)
+
+        return result
+
+    except Exception as e:
+        return {"error": str(e), "tool": "lock_in_detection"}
+
+
+async def handle_absorption_spectroscopy(args: Dict[str, Any]) -> Dict[str, Any]:
+    """Measure analyte concentration via Beer-Lambert law."""
+    try:
+        import numpy as np
+
+        # Extract arguments
+        wavelength = np.array(args["wavelength"])
+        transmission = np.array(args["transmission"])
+        path_length_cm = args.get("path_length_cm", 1.0)
+        epsilon = args.get("extinction_coefficient")
+        ref_wavelength = args.get("reference_wavelength")
+
+        # Compute absorbance: A = -log₁₀(T)
+        # Add small epsilon to avoid log(0)
+        transmission_safe = np.clip(transmission, 1e-10, 1.0)
+        absorbance = -np.log10(transmission_safe)
+
+        # Find peak absorption
+        peak_idx = np.argmax(absorbance)
+        peak_wavelength = wavelength[peak_idx]
+        peak_absorbance = absorbance[peak_idx]
+
+        # Use reference wavelength or peak
+        if ref_wavelength is not None:
+            # Find closest wavelength
+            ref_idx = np.argmin(np.abs(wavelength - ref_wavelength))
+            ref_wavelength_actual = wavelength[ref_idx]
+            ref_absorbance = absorbance[ref_idx]
+        else:
+            ref_wavelength_actual = peak_wavelength
+            ref_absorbance = peak_absorbance
+
+        result = {
+            "peak_wavelength_nm": float(peak_wavelength),
+            "peak_absorbance": float(peak_absorbance),
+            "reference_wavelength_nm": float(ref_wavelength_actual),
+            "reference_absorbance": float(ref_absorbance),
+            "path_length_cm": path_length_cm,
+            "mean_absorbance": float(np.mean(absorbance)),
+            "num_wavelengths": len(wavelength)
+        }
+
+        # Compute concentration if extinction coefficient is known
+        # Beer-Lambert law: A = ε·c·L  =>  c = A/(ε·L)
+        if epsilon is not None and epsilon > 0:
+            concentration_M = ref_absorbance / (epsilon * path_length_cm)
+            result["concentration_M"] = float(concentration_M)
+            result["concentration_mM"] = float(concentration_M * 1000)
+            result["extinction_coefficient_M_cm"] = epsilon
+        else:
+            result["note"] = "Provide extinction_coefficient to compute concentration"
+
+        return result
+
+    except Exception as e:
+        return {"error": str(e), "tool": "absorption_spectroscopy"}
+
+
+async def handle_cavity_ringdown_spectroscopy(args: Dict[str, Any]) -> Dict[str, Any]:
+    """Ultra-sensitive trace gas detection via cavity ringdown."""
+    try:
+        from lmfit import Model
+        import numpy as np
+
+        # Extract arguments
+        time = np.array(args["time"])  # microseconds
+        intensity = np.array(args["intensity"])
+        cavity_length_cm = args.get("cavity_length_cm", 50)
+        baseline_ringdown_us = args.get("baseline_ringdown_us")
+
+        # Define exponential decay model: I(t) = I₀·exp(-t/τ)
+        def exponential_decay(t, amplitude, tau, background):
+            return amplitude * np.exp(-t / tau) + background
+
+        # Create lmfit Model
+        model = Model(exponential_decay, independent_vars=['t'])
+
+        # Initial parameter guesses
+        amplitude_guess = np.max(intensity) - np.min(intensity)
+        background_guess = np.min(intensity)
+
+        # Estimate tau from half-life
+        half_max = (np.max(intensity) + np.min(intensity)) / 2
+        half_idx = np.argmin(np.abs(intensity - half_max))
+        tau_guess = time[half_idx] / np.log(2)  # τ = t_half / ln(2)
+
+        # Set up parameters
+        params = model.make_params(
+            amplitude=amplitude_guess,
+            tau=tau_guess,
+            background=background_guess
+        )
+        params['amplitude'].min = 0
+        params['tau'].min = 0
+        params['background'].min = 0
+
+        # Perform fit
+        result_fit = model.fit(intensity, params=params, t=time)
+
+        # Extract fitted ringdown time
+        tau_us = result_fit.params['tau'].value
+        tau_stderr = result_fit.params['tau'].stderr if result_fit.params['tau'].stderr is not None else 0.0
+
+        result = {
+            "ringdown_time_us": float(tau_us),
+            "ringdown_time_uncertainty_us": float(tau_stderr),
+            "amplitude": float(result_fit.params['amplitude'].value),
+            "background": float(result_fit.params['background'].value),
+            "chi_square": float(result_fit.chisqr),
+            "reduced_chi_square": float(result_fit.redchi),
+            "cavity_length_cm": cavity_length_cm,
+            "num_data_points": len(time)
+        }
+
+        # Compute absorption coefficient if baseline is provided
+        # α = (1/τ - 1/τ₀)·(c/2L)
+        # where c = 3×10¹⁰ cm/s (speed of light)
+        if baseline_ringdown_us is not None and baseline_ringdown_us > 0:
+            c_cm_per_s = 3e10  # cm/s
+            alpha_per_cm = (1/tau_us - 1/baseline_ringdown_us) * (c_cm_per_s / (2 * cavity_length_cm))
+            # Convert to per-meter for standard units
+            alpha_per_m = alpha_per_cm * 100
+
+            result["absorption_coefficient_per_cm"] = float(alpha_per_cm)
+            result["absorption_coefficient_per_m"] = float(alpha_per_m)
+            result["baseline_ringdown_us"] = baseline_ringdown_us
+        else:
+            result["note"] = "Provide baseline_ringdown_us to compute absorption coefficient"
+
+        return result
+
+    except Exception as e:
+        return {"error": str(e), "tool": "cavity_ringdown_spectroscopy"}
 
 
 # =============================================================================

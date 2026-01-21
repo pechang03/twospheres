@@ -11,12 +11,59 @@
 The TwoSphere-MCP architecture implements a **6-level functor hierarchy (F₀-F₆)** mapped to biological information processing levels (0-6) via the Gödel-Higman-FPT Divine Parameterization Theory. This design integrates:
 
 1. **Quantum optics** (entangled-pair-quantum-eraser project)
-2. **Classical spectroscopy** (PHY.1.2-packages)
+2. **Classical spectroscopy** (PHY.1.2-packages: lmfit, emcee, PyDynamic)
 3. **FPT algorithms** (merge2docs backend)
-4. **MRI brain geometry** (MRISpheres integration)
+4. **Brain communication patterns** (MRISpheres + merge2docs neuroscience research)
 5. **Lab-on-chip (LOC)** fabrication and sensing
 
 Each functor level has tractability guarantees through **divine parameterization** (physical laws as FPT bounds).
+
+---
+
+## 🧠 Brain Communication Integration ✨ NEW
+
+**Document:** [BRAIN_COMMUNICATION_INTEGRATION.md](./BRAIN_COMMUNICATION_INTEGRATION.md) (700+ lines)
+
+**Key Insight:** MRI functional connectivity measurement and optical lock-in detection use **identical mathematical frameworks** (FFT correlation, phase-locking, frequency-domain analysis).
+
+### Unified Framework
+
+```
+MRI (Brain Communication)              ↔  Optical (LOC Sensing)
+────────────────────────────────────────────────────────────────
+Distance correlation (dCor)            ↔  FFT pairwise correlation
+Phase-Locking Value (PLV)              ↔  Lock-in phase detection
+Cross-Frequency Coupling (CFC)         ↔  I/Q demodulation
+Local efficiency (graph theory)        ↔  Q-factor (resonator fault tolerance)
+Geodesic distance (brain surface)      ↔  Great circle arcs (two-sphere model)
+```
+
+### Drug Testing Workflow
+
+**Dual-Modality Validation:**
+1. **In Vivo (MRI)**: 4D MRI tracks brain communication changes post-drug administration
+2. **In Vitro (LOC)**: Interferometric sensing measures drug-protein binding kinetics
+3. **Correlation Analysis**: MRI biomarkers (Δ connectivity) ↔ Optical biomarkers (Δn)
+
+### Research Applications
+
+- **Alzheimer's Disease**: Track functional connectivity restoration with amyloid-targeting drugs
+- **Autism Spectrum Disorder**: Measure GABA modulator effects on hyper-connectivity
+- **Multi-Modal Biomarkers**: Predict drug response from early MRI + optical signatures
+
+### Implementation Status
+
+- ✅ **Spectroscopy packages** (lmfit/emcee/PyDynamic) integrated
+- ✅ **InterferometricSensor** (visibility fitting with Bayesian MCMC)
+- ✅ **DigitalLockIn** (phase-sensitive detection, FFT-based)
+- 🚧 **MRI signal processing** (distance correlation, network efficiency) - Planned
+- 🚧 **Two-sphere geodesics** (haversine formula, quaternion rotation) - Planned
+- 🚧 **Ernie2 swarm queries** (neuroscience + optics collections) - Planned
+
+**Related Documents:**
+- [MRI_TWOSPHERES_INTEGRATION.md](./MRI_TWOSPHERES_INTEGRATION.md) - Technical implementation details
+- [ERNIE2_SWARM_INTEGRATION.md](./ERNIE2_SWARM_INTEGRATION.md) - Query patterns for 36 collections
+- [SPECTROSCOPY_IMPLEMENTATION_SUMMARY.md](../SPECTROSCOPY_IMPLEMENTATION_SUMMARY.md) - Current optical sensing status
 
 ---
 
