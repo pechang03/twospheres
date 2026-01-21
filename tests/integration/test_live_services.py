@@ -157,28 +157,33 @@ class TestPRIMEDEServiceIntegration:
         """Test getting NIfTI path for real indexed subject."""
         async with httpx.AsyncClient(timeout=10.0) as client:
             response = await client.post(
-                f"{PRIME_DE_URL}/get_nifti_path",
+                f"{PRIME_DE_URL}/api/get_nifti_path",
                 json={
-                    "dataset_name": "BORDEAUX24",
-                    "subject_name": "m01",
-                    "suffix": "bold"
+                    "dataset": "bordeaux24",
+                    "subject": "sub-m01",
+                    "modality": "anat",
+                    "suffix": "T1w"
                 }
             )
             assert response.status_code == 200
             data = response.json()
-            assert "result" in data
-            assert "path" in data["result"]
-            assert Path(data["result"]["path"]).exists()
+            # Response format: {dataset, subject, modality, suffix, path, filename, exists}
+            assert "path" in data
+            assert "exists" in data
+            assert data["exists"] is True
+            assert Path(data["path"]).exists()
 
     @pytest.mark.asyncio
     async def test_list_datasets(self):
         """Test listing available datasets."""
         async with httpx.AsyncClient(timeout=10.0) as client:
-            response = await client.get(f"{PRIME_DE_URL}/datasets")
+            response = await client.get(f"{PRIME_DE_URL}/api/datasets")
             assert response.status_code == 200
             data = response.json()
             assert "datasets" in data
-            assert "BORDEAUX24" in data["datasets"]
+            # Dataset names are lowercase keys in the dict
+            assert "bordeaux24" in data["datasets"]
+            assert data["datasets"]["bordeaux24"]["subject_count"] >= 9
 
 
 class TestEndToEndPipeline:
