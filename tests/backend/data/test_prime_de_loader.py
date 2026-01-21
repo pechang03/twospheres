@@ -9,6 +9,7 @@ Tests cover:
 """
 
 import asyncio
+import httpx
 import numpy as np
 import pytest
 from pathlib import Path
@@ -201,18 +202,17 @@ class TestPRIMEDELoaderAPI:
 
     @pytest.mark.asyncio
     async def test_get_nifti_path_api_error(self):
-        """Test API error handling."""
+        """Test API error handling on HTTP request failure.
+
+        The httpx.HTTPError handling in the loader should propagate HTTP errors.
+        """
         loader = PRIMEDELoader()
 
-        with patch.object(loader.client, "post", new_callable=AsyncMock) as mock_post:
-            # Mock raise_for_status to raise an exception
-            def raise_error():
-                raise httpx.HTTPError("API Error")
+        # Create a failing mock response that propagates the error
+        async def failing_post(*args, **kwargs):
+            raise httpx.HTTPError("API connection failed")
 
-            mock_resp = AsyncMock()
-            mock_resp.raise_for_status = MagicMock(side_effect=raise_error)
-            mock_post.return_value = mock_resp
-
+        with patch.object(loader.client, "post", side_effect=failing_post):
             with pytest.raises(httpx.HTTPError):
                 await loader.get_nifti_path("BORDEAUX24", "m01", "bold")
 
