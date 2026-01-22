@@ -127,56 +127,65 @@ class FastObstructionDetector:
             logger.warning(f"FastMap creation failed: {e}, using exact fallback")
             return self._detect_k5_exact(G)
 
-        # Find candidate K₅ cliques using PAC queries
-        nodes = list(G.nodes())
-        candidates: Set[Tuple] = set()
-        pac_queries = 0
+        try:
+            # Find candidate K₅ cliques using PAC queries
+            nodes = list(G.nodes())
+            candidates: Set[Tuple] = set()
+            pac_queries = 0
 
-        # For each node, find neighbors with high common neighbor count
-        for u in nodes:
-            high_overlap_neighbors = []
+            # For each node, find neighbors with high common neighbor count
+            for u in nodes:
+                high_overlap_neighbors = []
 
-            for v in nodes:
-                if u >= v:  # Avoid duplicates
-                    continue
+                for v in nodes:
+                    if u >= v:  # Avoid duplicates
+                        continue
 
-                pac_queries += 1
+                    pac_queries += 1
 
-                # Query: Do u and v share >= 3 common neighbors?
-                # (In K₅, each pair shares exactly 3 common neighbors)
-                has_k_common, is_exact = bridge.query_k_common_neighbors_pac(
-                    graph_id, str(u), str(v), k=3, margin=margin
-                )
+                    # Query: Do u and v share >= 3 common neighbors?
+                    # (In K₅, each pair shares exactly 3 common neighbors)
+                    has_k_common, is_exact = bridge.query_k_common_neighbors_pac(
+                        graph_id, str(u), str(v), k=3, margin=margin
+                    )
 
-                if has_k_common:
-                    high_overlap_neighbors.append(v)
+                    if has_k_common:
+                        high_overlap_neighbors.append(v)
 
-            # If u has >= 4 neighbors with high overlap, it might be in K₅
-            if len(high_overlap_neighbors) >= 4:
-                # Check all 5-subsets containing u
-                from itertools import combinations
-                for subset in combinations(high_overlap_neighbors, 4):
-                    candidate = tuple(sorted([u] + list(subset)))
-                    candidates.add(candidate)
+                # If u has >= 4 neighbors with high overlap, it might be in K₅
+                if len(high_overlap_neighbors) >= 4:
+                    # Check all 5-subsets containing u
+                    from itertools import combinations
+                    for subset in combinations(high_overlap_neighbors, 4):
+                        candidate = tuple(sorted([u] + list(subset)))
+                        candidates.add(candidate)
 
-        logger.info(f"PAC K₅ detection: {pac_queries} queries, {len(candidates)} candidates")
+            logger.info(f"PAC K₅ detection: {pac_queries} queries, {len(candidates)} candidates")
 
-        # Verify candidates (check if they form complete graphs)
-        k5_cliques = []
-        for candidate in candidates:
-            if self._is_clique(G, candidate):
-                k5_cliques.append(candidate)
+            # Verify candidates (check if they form complete graphs)
+            k5_cliques = []
+            for candidate in candidates:
+                if self._is_clique(G, candidate):
+                    k5_cliques.append(candidate)
 
-        has_k5 = len(k5_cliques) > 0
-        strength = min(1.0, len(k5_cliques) / max(1, len(candidates)))
+            has_k5 = len(k5_cliques) > 0
+            strength = min(1.0, len(k5_cliques) / max(1, len(candidates)))
 
-        return {
-            'has_obstruction': has_k5,
-            'type': 'K5' if has_k5 else None,
-            'strength': strength,
-            'cliques': k5_cliques,
-            'method': 'pac'
-        }
+            return {
+                'has_obstruction': has_k5,
+                'type': 'K5' if has_k5 else None,
+                'strength': strength,
+                'cliques': k5_cliques,
+                'method': 'pac'
+            }
+        finally:
+            # CRITICAL: Clean up FastMap graph to prevent memory leak
+            try:
+                if hasattr(bridge, 'delete_fastmap_graph'):
+                    bridge.delete_fastmap_graph(graph_id)
+                    logger.debug(f"Cleaned up FastMap graph: {graph_id}")
+            except Exception as cleanup_error:
+                logger.warning(f"Failed to cleanup FastMap graph {graph_id}: {cleanup_error}")
 
     def _detect_k5_exact(self, G: nx.Graph) -> Dict[str, Any]:
         """
