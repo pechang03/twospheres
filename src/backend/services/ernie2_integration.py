@@ -192,11 +192,131 @@ class Ernie2SwarmClient:
         return params
 
 
+class YadaServicesMCPClient:
+    """Client for querying ernie2_swarm via yada-services-secure MCP server.
+
+    Uses the REST /api/call_tool endpoint on port 8002.
+    """
+
+    def __init__(self, host: str = "localhost", port: int = 8002):
+        """Initialize MCP client.
+
+        Args:
+            host: yada-services-secure host
+            port: yada-services-secure port (default: 8002)
+        """
+        self.base_url = f"http://{host}:{port}"
+
+    async def health_check(self) -> bool:
+        """Check if yada-services-secure is running."""
+        try:
+            import aiohttp
+            async with aiohttp.ClientSession() as session:
+                async with session.get(f"{self.base_url}/health") as resp:
+                    return resp.status == 200
+        except Exception:
+            return False
+
+    async def call_tool(self, tool_name: str, arguments: Dict[str, Any]) -> Dict[str, Any]:
+        """Call an MCP tool via REST endpoint.
+
+        Args:
+            tool_name: Name of the tool (e.g., "ernie2_swarm")
+            arguments: Tool arguments
+
+        Returns:
+            Tool result or error dict
+        """
+        try:
+            import aiohttp
+            async with aiohttp.ClientSession() as session:
+                payload = {
+                    "name": tool_name,
+                    "arguments": arguments
+                }
+                async with session.post(
+                    f"{self.base_url}/api/call_tool",
+                    json=payload,
+                    timeout=aiohttp.ClientTimeout(total=120)
+                ) as resp:
+                    result = await resp.json()
+                    return result
+        except ImportError:
+            # Fallback to requests if aiohttp not available
+            import requests
+            payload = {
+                "name": tool_name,
+                "arguments": arguments
+            }
+            resp = requests.post(
+                f"{self.base_url}/api/call_tool",
+                json=payload,
+                timeout=120
+            )
+            return resp.json()
+        except Exception as e:
+            return {"error": str(e)}
+
+    async def query_ernie2(
+        self,
+        question: str,
+        context: Optional[str] = None,
+        collections: Optional[List[str]] = None,
+        max_steps: int = 3,
+        style: str = "detailed"
+    ) -> Dict[str, Any]:
+        """Query ernie2_swarm via yada-services-secure.
+
+        Args:
+            question: Question to ask domain experts
+            context: Optional context for the query
+            collections: Optional list of collections (comma-separated string)
+            max_steps: Number of minion steps
+            style: Response style ("concise" or "detailed")
+
+        Returns:
+            Dict with answer or error
+        """
+        arguments = {
+            "query": question,
+            "max_steps": max_steps,
+            "style": style
+        }
+        if context:
+            arguments["context"] = context
+        if collections:
+            arguments["collections"] = ",".join(collections)
+
+        result = await self.call_tool("ernie2_swarm", arguments)
+
+        # Handle result format
+        if "result" in result:
+            return {
+                "answer": result["result"],
+                "collections_queried": collections or [],
+                "success": True
+            }
+        elif "error" in result:
+            return {
+                "answer": None,
+                "error": result["error"],
+                "collections_queried": collections or [],
+                "success": False
+            }
+        else:
+            return {
+                "answer": str(result),
+                "collections_queried": collections or [],
+                "success": True
+            }
+
+
 # Convenience function for MCP tools
 async def query_expert_collections(
     question: str,
     collections: List[str],
-    use_cloud: bool = False
+    use_cloud: bool = False,
+    use_mcp: bool = True
 ) -> Dict[str, Any]:
     """
     Convenience function for querying ernie2_swarm from MCP tools.
@@ -204,7 +324,9 @@ async def query_expert_collections(
     Args:
         question: Question to ask
         collections: List of collection names
-        use_cloud: Use Groq (cloud) or MLX (local)
+        use_cloud: Use Groq (cloud) or MLX (local) - only for subprocess mode
+        use_mcp: If True, use yada-services-secure MCP (recommended)
+                 If False, use subprocess to call ernie2_swarm.py directly
 
     Returns:
         Query result dict
@@ -215,5 +337,9 @@ async def query_expert_collections(
         ...     collections=["neuroscience_MRI", "bioengineering_LOC"]
         ... )
     """
-    client = Ernie2SwarmClient(use_cloud=use_cloud)
-    return await client.query(question, collections)
+    if use_mcp:
+        client = YadaServicesMCPClient()
+        return await client.query_ernie2(question, collections=collections)
+    else:
+        client = Ernie2SwarmClient(use_cloud=use_cloud)
+        return await client.query(question, collections)

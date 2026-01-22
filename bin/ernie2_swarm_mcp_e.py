@@ -1,0 +1,1 @@
+/Users/petershaw/code/aider/merge2docs/bin/ernie2_swarm_mcp_e.py
