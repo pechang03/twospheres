@@ -1,143 +1,205 @@
 # TwoSphere MCP Server
 
-An MCP server for optical physics simulations and MRI spherical geometry analysis, integrating pyoptools with the MRISpheres/twospheres research project.
+A cross-domain physics research platform integrating **fMRI neuroscience**, **optical simulations**, **graph theory**, and **topological structures**. Built as an MCP server with tools for brain network analysis, optical system design, and quantum-inspired algorithms.
 
-## 🔬 Features
+## Research Domains
 
-### MRI Analysis Tools
-1. **Two-Sphere Visualization** - 3D visualization of paired brain regions
-2. **Vortex Ring Analysis** - Trefoil knot and vortex tube modeling for connectivity patterns
-3. **FFT Correlation** - Frequency-domain correlation between brain regions
-4. **Distance Metrics** - Geometric interpretation of functional connectivity
+### 1. Neuroimaging (fMRI/MRI Analysis)
 
-### Optical Simulation Tools (pyoptools)
-5. **Ray Tracing** - Optical system simulation
-6. **Wavefront Analysis** - Wavefront calculations and visualization
-7. **Lens Design** - Optical element placement and optimization
+**Two-Sphere Brain Model** - Geometric framework for functional connectivity:
+- Paired brain region geometry with distance/overlap metrics
+- FFT correlation for frequency-domain coupling analysis
+- Disc dimension estimation for network complexity
+- Integration with MRISpheres research data
 
-## 📦 Quick Start
+**Key modules**: `src/backend/mri/`
+- `two_sphere.py` - Paired region geometry
+- `fft_correlation.py` - Frequency-domain cross-correlation
+- `disc_dimension_analysis.py` - Graph embedding dimension
+- `fast_obstruction_detection.py` - K₅/K₃,₃ planarity testing
+- `tripartite_multiplex_analysis.py` - Multi-layer brain networks
+
+### 2. Optical Physics & Photonics
+
+**Optical Simulation Stack** - pyoptools integration with advanced analysis:
+- Ray tracing and wavefront analysis (Zernike decomposition)
+- Fiber optics mode matching and coupling design
+- Optical resonator optimization
+- Adaptive feedback control systems
+
+**Key modules**: `src/backend/optics/`
+- `ray_tracing.py` - pyoptools wrapper
+- `wavefront.py` - Zernike polynomial decomposition
+- `fiber_optics.py` - Mode matching, coupling efficiency
+- `feedback_control.py` - Adaptive resonator control
+- `alignment_sensitivity.py` - Tolerance analysis
+
+**Services**: `src/backend/services/`
+- `resonator_optimizer.py` - Optical cavity design
+- `fiber_coupling_designer.py` - Fiber-to-chip coupling
+- `loc_simulator.py` - Lab-on-chip photonic circuits
+- `sensing_service.py` - Interferometric biosensing
+
+### 3. Topology & Geometric Structures
+
+**Vortex Ring / Knot Theory** - Neural pathway modeling via topology:
+- Trefoil knot parametric curves
+- Frenet-Serret frame computation for tube surfaces
+- Topological invariants for connectivity patterns
+
+**Key module**: `src/backend/mri/vortex_ring.py`
+```python
+from src.backend.mri import VortexRing
+
+# Create trefoil knot for neural pathway visualization
+vortex = VortexRing(n_turns=3)  # Trefoil
+x, y, z = vortex.compute_curve(num_points=1000)
+surface = vortex.compute_tube_surface(tube_radius=0.2)
+```
+
+**Applications**:
+- Resonator cavity shapes (toroidal, helical, Mobius geometries)
+- White matter tract topology
+- Optical vortex beam generation
+
+### 4. Graph Theory & Obstruction Detection
+
+**Structural Graph Analysis** - Based on Robertson-Seymour theory:
+- Kuratowski obstruction detection (K₅, K₃,₃)
+- Disc dimension estimation via planarity
+- PAC-accelerated k-common neighbor queries
+
+**Theoretical Foundation**: Paul, Protopapas, Thilikos (2023) - "Graph Parameters, Universal Obstructions, and WQO" (arXiv:2304.03688)
+
+```python
+from src.backend.mri.fast_obstruction_detection import disc_dimension_via_obstructions
+
+result = disc_dimension_via_obstructions(brain_graph, use_pac=True)
+# Returns: disc_dim_estimate (2=planar, 3+=non-planar)
+```
+
+### 5. Quantum-Inspired Algorithms
+
+**Quantum Network Operators** - Spectral methods for brain networks:
+- Quantum walk-based connectivity analysis
+- Tensor network routing (QEC integration)
+- Eigenvalue-based graph characterization
+
+**Key modules**:
+- `src/backend/mri/quantum_network_operators.py`
+- `src/backend/services/qec_tensor_service.py`
+
+## Cross-Domain Connections
+
+| Domain | Shared Tools | Application |
+|--------|--------------|-------------|
+| Neuro + Graph | Obstruction detection | Brain network complexity bounds |
+| Optics + Topology | Vortex structures | Resonator cavity design |
+| Neuro + Optics | Wavefront analysis | Neural signal decomposition |
+| Graph + Quantum | Spectral methods | Connectivity eigenvalues |
+
+## Quick Start
 
 ### Installation
 
 ```bash
-# Create dedicated conda environment
 conda create -n twosphere python=3.11
 conda activate twosphere
-
-# Install dependencies
 pip install -r requirements.txt
 
-# Link to MRISpheres research
+# Link to MRISpheres research data
 ln -s ~/MRISpheres/twospheres data/twospheres
 ```
 
 ### Configuration
 
 Create `.env_twosphere`:
-
 ```bash
-# MRISpheres data path
 TWOSPHERES_PATH=~/MRISpheres/twospheres
-
-# Server settings
 TWOSPHERE_PORT=8006
-
-# Optional: OpenAI for advanced analysis
-OPENAI_API_KEY=your_key_here
 ```
 
-## 🚀 Usage
-
-### As MCP Server (stdio)
+### Run MCP Server
 
 ```bash
+# stdio mode (for Claude Desktop, etc.)
 python bin/twosphere_mcp.py
-```
 
-### As HTTP Server
-
-```bash
+# HTTP/SSE mode
 python bin/twosphere_http_server.py --port 8006
 ```
 
-### With ernie2_swarm
-
-```bash
-# Query optical physics with twosphere integration
-python ../merge2docs/bin/ernie2_swarm_mcp.py \
-    -q "Explain how spherical harmonics relate to MRI signal analysis" \
-    -c docs_library_Physics \
-    -c docs_library_Neuroscience
-```
-
-## 🧪 Example: Two-Sphere Correlation
-
-```python
-from src.mri_analysis import TwoSphereModel, compute_fft_correlation
-
-# Create paired brain region model
-model = TwoSphereModel(radius=1.0)
-model.add_sphere(center=[0, 1, 0], label="Region_A")
-model.add_sphere(center=[0, -1, 0], label="Region_B")
-
-# Compute frequency-domain correlation
-correlation = compute_fft_correlation(
-    region_a_signal,
-    region_b_signal,
-    sampling_rate=1000
-)
-print(f"Cross-correlation peak: {correlation.peak_value}")
-```
-
-## 📁 Project Structure
+## Project Structure
 
 ```
 twosphere-mcp/
 ├── bin/
-│   ├── twosphere_mcp.py        # MCP server (stdio)
-│   └── twosphere_http_server.py # HTTP/SSE server
+│   ├── twosphere_mcp.py           # MCP server (stdio)
+│   └── twosphere_http_server.py   # HTTP/SSE server
 ├── src/
-│   ├── simulations/            # pyoptools wrappers
-│   │   ├── ray_tracing.py
-│   │   └── wavefront.py
-│   └── mri_analysis/           # MRISpheres integration
-│       ├── two_sphere.py
-│       ├── vortex_ring.py
-│       └── fft_correlation.py
-├── data/
-│   └── twospheres -> ~/MRISpheres/twospheres
-├── tests/
+│   ├── backend/
+│   │   ├── mri/                   # Brain network analysis
+│   │   │   ├── two_sphere.py
+│   │   │   ├── vortex_ring.py
+│   │   │   ├── fft_correlation.py
+│   │   │   ├── fast_obstruction_detection.py
+│   │   │   ├── disc_dimension_analysis.py
+│   │   │   └── quantum_network_operators.py
+│   │   ├── optics/                # Optical simulations
+│   │   │   ├── ray_tracing.py
+│   │   │   ├── wavefront.py
+│   │   │   ├── fiber_optics.py
+│   │   │   └── feedback_control.py
+│   │   ├── services/              # High-level APIs
+│   │   │   ├── resonator_optimizer.py
+│   │   │   ├── fiber_coupling_designer.py
+│   │   │   ├── loc_simulator.py
+│   │   │   └── sensing_service.py
+│   │   └── visualization/         # 3D rendering
+│   ├── atlases/                   # Brain atlas integration
+│   └── simulations/               # Legacy pyoptools wrappers
 ├── docs/
-├── examples/
-├── requirements.txt
-└── .env_twosphere
+│   ├── papers/                    # Research references
+│   └── beads/                     # Session notes
+└── tests/
 ```
 
-## 🔗 Integration with MRISpheres
+## Research Context
 
-This MCP server wraps and extends the research code from `~/MRISpheres/twospheres/`:
+**Primary Paper**: "Integrating Correlation and Distance Analysis in Alzheimer's Disease"
 
-- `two_spheres.py` → `src/mri_analysis/two_sphere.py`
-- `VortexRingInterpolation.py` → `src/mri_analysis/vortex_ring.py`
-- `signal_processing.py` → `src/mri_analysis/fft_correlation.py`
+The two-sphere model provides a geometric framework unifying:
+- Functional connectivity via frequency-domain correlation
+- Structural complexity via graph obstruction theory
+- Topological pathway analysis via knot invariants
 
-## 📚 Research Context
+**Key References** (see `docs/papers/`):
+- Paul et al. 2023 - Universal obstructions for graph parameters
+- Robertson-Seymour Graph Minor Theorem
+- Kuratowski's planarity criterion
 
-Based on the paper: "Integrating Correlation and Distance Analysis in Alzheimer's Disease"
+## Dependencies
 
-The two-sphere model provides a geometric framework for:
-- Functional connectivity analysis via frequency-domain correlation
-- Distance metrics between brain regions
-- Visualization of neural pathway changes in AD progression
-
-## 🔧 Dependencies
-
-- **pyoptools** >= 0.3.7 - Optical system simulation
-- **numpy** - Numerical computing
-- **scipy** - Signal processing and interpolation
+- **pyoptools** >= 0.3.7 - Optical simulation
+- **networkx** - Graph algorithms
+- **numpy/scipy** - Numerical computing
 - **matplotlib** - Visualization
-- **mcp** - Model Context Protocol server
+- **mcp** - Model Context Protocol
 
-## 📄 License
+## Task Tracking
+
+Uses `bd` (beads) for issue tracking with PHY prefix:
+- `PHY.1.x` - MRI analysis tasks
+- `PHY.2.x` - Optical simulations
+- `PHY.3.x` - Signal processing
+- `PHY.4.x` - Topology/vortex
+
+```bash
+bd list          # Show all tasks
+bd ready         # Show unblocked work
+bd show PHY.2.1  # Task details
+```
+
+## License
 
 Research code - see MRISpheres project for licensing.
