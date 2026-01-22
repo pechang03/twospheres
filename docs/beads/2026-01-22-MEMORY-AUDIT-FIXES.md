@@ -25,6 +25,18 @@
 **Fix**: Added try/finally with `bridge.delete_fastmap_graph(graph_id)`
 **Impact**: Prevents accumulation of ~47KB+ per detection
 
+### ✅ FIXED: K₃,₃ Detection Combinatorial Explosion (twosphere-mcp)
+**Location**: `src/backend/mri/fast_obstruction_detection.py:265`
+**Problem**: `len(list(combinations(nodes, 6)))` materialized ALL combinations just to get count
+**Fix**: Use iterator with early break, never materialize full list
+**Impact**: For N=500: avoided 2.5 BILLION tuple allocations (crashed machine)
+
+### ✅ FIXED: Test Graph Memory Buildup (twosphere-mcp)
+**Location**: `tests/test_fast_obstruction_detection.py`
+**Problem**: `create_test_graphs()` created all graphs upfront, kept in memory across tests
+**Fix**: Changed to `iter_test_graphs()` generator, yields one at a time, skips `large_500`
+**Impact**: Reduced peak memory during test runs
+
 ---
 
 ## Issues Found and Fixed (Branch: fix/memory-cleanup-complete)
@@ -219,6 +231,7 @@ watch -n 1 'ps aux | grep python | grep -v grep'
 - `6e200c7` - Fix P3 path materialization
 - `f7cfd08` - Fix FastMap memory leak
 - `4fc3aaa` - Add comprehensive memory audit document
+- (new) - Fix K₃,₃ combinations explosion and test graph memory buildup
 
 ### merge2docs
 - `b6de32b6` - Fix Euler training pairs

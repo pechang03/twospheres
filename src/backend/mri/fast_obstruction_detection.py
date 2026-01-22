@@ -261,16 +261,21 @@ class FastObstructionDetector:
         k33_sets = []
 
         # Check all 6-node subsets (combinatorially expensive for large graphs)
-        # Limit search for performance
-        max_subsets = min(1000, len(list(combinations(nodes, 6))))
+        # Limit search for performance - DO NOT materialize combinations, use iterator
+        checked = 0
+        max_checks = 1000
 
-        for i, subset in enumerate(combinations(nodes, 6)):
-            if i >= max_subsets:
+        for subset in combinations(nodes, 6):
+            if checked >= max_checks:
                 break
+            checked += 1
 
             subgraph = G.subgraph(subset)
 
-            # Check if subgraph is bipartite
+            # Check if subgraph is connected and bipartite
+            if not nx.is_connected(subgraph):
+                continue
+
             if bp.is_bipartite(subgraph):
                 # Check if it's complete bipartite
                 node_sets = bp.sets(subgraph)
