@@ -390,7 +390,7 @@ We demonstrate that **small obstruction sets suffice for practical graph problem
 **Status**: DRAFT - Needs completion and review before sending to Mike Fellows
 
 **TODO**:
-- [ ] Verify disc=1 obstructions (K₄ and K₂,₂?)
+- [x] Verify disc=1 obstructions: K₄ and K₂,₃ ✓
 - [ ] Get Faisal's paper citation
 - [ ] Complete theoretical analysis section (pending co-authorship decision)
 - [ ] Add more rigorous statistical analysis of results
