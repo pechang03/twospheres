@@ -31,6 +31,10 @@ Related:
 - examples/freecad_cfd_microfluidics.py - CFD flow simulation
 - examples/cfd_microfluidics_example.py - Shear stress analysis
 - docs/CFDOF_INSTALL.md - OpenFOAM installation
+- ../biosearch/ - Computational drug discovery (compounds to test)
+- ../biosearch/COMPREHENSIVE_RESEARCH_REPORT.md - P3-cover cancer targets
+
+Workflow: biosearch (compound discovery) → PHLoC (organoid testing) → spectroscopy (drug response)
 """
 
 import xmlrpc.client
@@ -118,22 +122,23 @@ pdms_inject_out = fiber_out_diameter * 1.45  # ~145 µm
 microchannel_diameter = 0.100  # 100 µm channels (was 10µm - too high shear)
 n_parallel_channels = 3  # 3 parallel channels for laminar flow distribution
 
-# Lens parameters (scaled for small chamber)
-# Option: convex+concave pair on input for better beam control
-lens_radius = 0.5  # 1mm diameter ball lens
-lens_spacing = 0.8  # Spacing between convex-concave pair
-use_lens_pair = True  # True = convex+concave pair, False = single ball lens
+# ============================================
+# 2D Lens parameters (PDMS printable)
+# Can't print ball lenses - use 2D cylindrical profiles instead
+# Air cavities in PDMS create refraction (n_air=1.0, n_PDMS≈1.4)
+# ============================================
+lens_radius = 0.5  # Radius of curvature for lens surfaces
+lens_height = 2.0  # Height of cylindrical lens (Z direction)
+lens_thickness = 0.3  # Thickness at lens center
 
-# Lens positions
-if use_lens_pair:
-    # Input: convex (collimate) + concave (expand/shape)
-    lens1a_x = -chamber_length/2 - 2.0  # Convex (closer to fiber)
-    lens1b_x = lens1a_x + lens_spacing + lens_radius  # Concave
-    lens1_x = lens1b_x  # For compatibility with optical channel routing
-else:
-    lens1_x = -chamber_length/2 - 1.5
+# Input: convex (collimate fiber) + concave (shape beam)
+# Output: convex (focus onto output fiber)
+lens1a_x = -chamber_length/2 - 2.5  # Input convex (closer to fiber)
+lens1b_x = lens1a_x + lens_thickness + 0.5  # Input concave (after convex)
+lens2_x = chamber_length/2 + 1.5  # Output convex
 
-lens2_x = chamber_length/2 + 1.5  # Output: single ball lens (collection)
+# For optical channel routing compatibility
+lens1_x = lens1b_x + lens_thickness
 
 # ============================================
 # Main chip body
@@ -229,29 +234,55 @@ pdms_out_channel = Part.makeCylinder(
 chip = chip.cut(pdms_out_channel)
 
 # ============================================
-# Ball lens cavities
-# Input: convex+concave pair (if enabled) for beam shaping
-# Output: single ball lens for collection
+# 2D Cylindrical lens cavities (air-filled, PDMS printable)
+# Convex = cylinder bulging INTO the air cavity (PDMS surrounds)
+# Concave = cylinder bulging OUT of the air cavity
+# Air/PDMS interface: n_air=1.0, n_PDMS≈1.4
 # ============================================
-if use_lens_pair:
-    # Convex lens cavity (closer to fiber - collimates)
-    lens1a_cav = Part.makeSphere(lens_radius * 1.02, Vector(lens1a_x, 0, optical_z))
-    chip = chip.cut(lens1a_cav)
-    # Concave lens cavity (plano-concave approximated as smaller sphere cutout)
-    # Creates diverging effect to shape beam for chamber
-    concave_r = lens_radius * 0.7  # Smaller radius = stronger divergence
-    lens1b_cav = Part.makeSphere(concave_r * 1.02, Vector(lens1b_x, 0, optical_z))
-    chip = chip.cut(lens1b_cav)
-    # Channel between lens pair
-    lens_pair_ch = Part.makeCylinder(0.3, lens_spacing,
-                                      Vector(lens1a_x + lens_radius, 0, optical_z), Vector(1,0,0))
-    chip = chip.cut(lens_pair_ch)
-else:
-    lens1_cav = Part.makeSphere(lens_radius * 1.02, Vector(lens1_x, 0, optical_z))
-    chip = chip.cut(lens1_cav)
 
-# Output lens cavity (single ball lens)
-lens2_cav = Part.makeSphere(lens_radius * 1.02, Vector(lens2_x, 0, optical_z))
+# Helper: Create 2D lens cavity (cylindrical, extruded in Z)
+def make_2d_lens_cavity(x_pos, radius, is_convex, height, thickness):
+    # Cylindrical lens: circular arc extruded vertically
+    # For convex: sphere center is BEHIND the lens surface (in PDMS)
+    # For concave: sphere center is IN FRONT (in air channel)
+    if is_convex:
+        # Convex air cavity - bulges toward light source
+        cyl = Part.makeCylinder(radius, height,
+                                Vector(x_pos + radius - thickness, 0, optical_z - height/2),
+                                Vector(0, 0, 1))
+        # Cut a box to make plano-convex shape
+        box = Part.makeBox(radius * 2, radius * 2, height + 1,
+                           Vector(x_pos + radius - thickness, -radius, optical_z - height/2 - 0.5))
+        return cyl.common(box)  # Intersection gives lens shape
+    else:
+        # Concave air cavity - bulges away from light
+        cyl = Part.makeCylinder(radius, height,
+                                Vector(x_pos - radius + thickness, 0, optical_z - height/2),
+                                Vector(0, 0, 1))
+        box = Part.makeBox(radius * 2, radius * 2, height + 1,
+                           Vector(x_pos - radius * 2 + thickness, -radius, optical_z - height/2 - 0.5))
+        lens_shape = cyl.cut(box)  # Difference gives concave
+        # Add rectangular channel for the air path
+        channel = Part.makeBox(thickness * 2, radius * 0.6, height,
+                               Vector(x_pos - thickness, -radius * 0.3, optical_z - height/2))
+        return lens_shape.fuse(channel)
+
+# Input convex lens (collimates fiber output)
+lens1a_cav = make_2d_lens_cavity(lens1a_x, lens_radius, True, lens_height, lens_thickness)
+chip = chip.cut(lens1a_cav)
+
+# Input concave lens (shapes/expands beam for chamber)
+concave_r = lens_radius * 0.8  # Slightly smaller radius
+lens1b_cav = make_2d_lens_cavity(lens1b_x, concave_r, False, lens_height, lens_thickness)
+chip = chip.cut(lens1b_cav)
+
+# Air channel between input lens pair
+lens_pair_ch = Part.makeBox(abs(lens1b_x - lens1a_x) - lens_thickness, 0.4, lens_height,
+                             Vector(lens1a_x + lens_thickness, -0.2, optical_z - lens_height/2))
+chip = chip.cut(lens_pair_ch)
+
+# Output convex lens (focuses onto output fiber)
+lens2_cav = make_2d_lens_cavity(lens2_x, lens_radius, True, lens_height, lens_thickness)
 chip = chip.cut(lens2_cav)
 
 # Optical channels: lens to chamber (clear optical path)
@@ -421,14 +452,11 @@ for name, x, y in [("FluidIn", res_in_x, res_in_y), ("FluidOut", res_out_x, res_
     t_obj.ViewObject.ShapeColor = (0.65, 0.65, 0.7)
 
 # ============================================
-# Ball lenses (BK7 glass)
+# 2D Air lens cavities are already cut from PDMS chip
+# No separate lens objects needed - air/PDMS interface IS the lens
+# Refractive index: n_air = 1.0, n_PDMS ≈ 1.4
 # ============================================
-for i, x in enumerate([lens1_x, lens2_x]):
-    lens = Part.makeSphere(lens_radius * 0.98, Vector(x, 0, optical_z))
-    l_obj = doc.addObject("Part::Feature", f"BallLens_{i+1}")
-    l_obj.Shape = lens
-    l_obj.ViewObject.ShapeColor = (0.6, 0.8, 1.0)
-    l_obj.ViewObject.Transparency = 50
+print("  Note: Lenses are air cavities in PDMS (no glass needed)")
 
 # ============================================
 # Optical fibers (correct diameters)
@@ -457,11 +485,9 @@ print("PHLoC Organoid Chip created!")
 print(f"  Chip: {chip_length} x {chip_width} x {chip_height} mm")
 print(f"  Chamber: {chamber_length} x {chamber_width} x {chamber_height} mm = {chamber_volume_uL:.1f} µL")
 print(f"  Micro-wells: {n_wells_x}x{n_wells_y}={n_wells_x*n_wells_y} wells ({microwell_r*2*1000:.0f}µm) for cell seeding")
-if use_lens_pair:
-    print(f"  Input optics: convex+concave pair ({lens_radius*2}mm + {concave_r*2}mm)")
-else:
-    print(f"  Input optics: ball lens ({lens_radius * 2}mm)")
-print(f"  Output optics: ball lens ({lens_radius * 2}mm)")
+print(f"  Input optics: 2D convex+concave pair (air cavities, r={lens_radius}mm + {concave_r}mm)")
+print(f"  Output optics: 2D convex lens (air cavity, r={lens_radius}mm)")
+print(f"  Lens material: Air in PDMS (n_air=1.0, n_PDMS=1.4)")
 print(f"  Fiber input: {fiber_in_diameter * 1000:.0f} µm with wedge entry + supports")
 print(f"  Fiber output: {fiber_out_diameter * 1000:.0f} µm with wedge entry")
 print(f"  Microchannels: {n_parallel_channels}x {microchannel_diameter * 1000:.0f} µm parallel (gentle laminar)")
@@ -494,16 +520,18 @@ from pyoptools.raytrace.shape import Circular
 
 doc = App.ActiveDocument
 
-# Lens parameters (matching organoid chip)
+# Lens parameters (matching organoid chip - 2D air lenses in PDMS)
 chamber_length = 1.5
-lens_r = 0.5  # 1mm diameter ball lens
-lens1_x = -chamber_length/2 - 1.5  # -2.25mm
-lens2_x = chamber_length/2 + 1.5   # +2.25mm
-n_glass = 1.5168  # BK7
+lens_r = 0.5  # Radius of curvature
+lens1_x = -chamber_length/2 - 2.0  # Input lens position
+lens2_x = chamber_length/2 + 1.5   # Output lens position
+n_pdms = 1.4  # PDMS refractive index
+n_air = 1.0   # Air refractive index
 optical_z = 3.0  # chip_height / 2
 
-# Focal length (thin lens approx for ball lens)
-f = lens_r * n_glass / (2 * (n_glass - 1))
+# Focal length for plano-convex air lens in PDMS
+# f = R / (n_pdms - n_air) for air-PDMS interface
+f = lens_r / (n_pdms - n_air)  # ~1.25mm focal length
 
 # Generate rays from 50µm input fiber
 n_rays = 11
@@ -547,9 +575,10 @@ for i, pts in enumerate(rays_data):
 
 doc.recompute()
 print(f"Ray trace complete: {n_rays} rays")
-print(f"Ball lens focal length: {f:.2f} mm")
+print(f"2D air lens focal length: {f:.2f} mm (air/PDMS interface)")
 print(f"Input fiber: 50 µm, Output fiber: 100 µm")
 print(f"Chamber optical path: {chamber_length} mm")
+print(f"Refractive indices: n_air={n_air}, n_PDMS={n_pdms}")
 '''
 
     result = server.execute_code(code)
