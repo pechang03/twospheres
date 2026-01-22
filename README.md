@@ -199,7 +199,15 @@ get_view         # Screenshot feedback
 insert_part_from_library  # Standard optical components
 ```
 
-**Workflow**: Design (FreeCAD) → Simulate (twosphere) → Print (PDMS) → Test
+**Workflow**: Design (FreeCAD) → Simulate (twosphere) → Print (PDMS 100nm) → Test
+
+**Quick Start** (requires FreeCAD with MCP addon running):
+```bash
+# Start FreeCAD RPC server first (MCP Addon toolbar → Start RPC Server)
+python examples/freecad_phloc_raytrace.py
+```
+
+This creates a PHLoC chip with ball lenses and ray traces through it.
 
 ## Dependencies
 
