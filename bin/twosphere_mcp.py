@@ -34,6 +34,55 @@ server = Server("twosphere-mcp")
 
 
 # =============================================================================
+# Expert Query Integration (ernie2_swarm)
+# =============================================================================
+
+# Collection mappings for domain-expert queries
+EXPERT_COLLECTIONS = {
+    "interferometric_sensing": ["docs_library_neuroscience_MRI", "docs_library_physics_optics"],
+    "lock_in_detection": ["docs_library_physics_optics", "docs_library_statistics"],
+    "absorption_spectroscopy": ["docs_library_bioengineering_LOC", "docs_library_physics_optics"],
+    "optimize_resonator": ["docs_library_physics_optics", "docs_library_mathematics"],
+    "microfluidics": ["docs_library_bioengineering_LOC", "docs_library_neuroscience_MRI"],
+}
+
+
+async def query_domain_experts(
+    question: str,
+    tool_name: str,
+    collections: Optional[List[str]] = None
+) -> Dict[str, Any]:
+    """Query ernie2_swarm for domain-expert parameter suggestions.
+
+    Args:
+        question: Question to ask domain experts
+        tool_name: Name of the tool (for collection selection)
+        collections: Override default collections
+
+    Returns:
+        Dict with 'answer' and optionally 'parameters' extracted from response
+    """
+    try:
+        from backend.services.ernie2_integration import YadaServicesMCPClient
+
+        # Use tool-specific collections or provided ones
+        cols = collections or EXPERT_COLLECTIONS.get(tool_name, [])
+
+        client = YadaServicesMCPClient()
+        result = await client.query_ernie2(
+            question=question,
+            collections=cols,
+            max_steps=2,
+            style="technical"
+        )
+
+        return result
+
+    except Exception as e:
+        return {"error": str(e), "answer": None}
+
+
+# =============================================================================
 # Tool Definitions
 # =============================================================================
 
@@ -235,7 +284,8 @@ async def list_tools() -> List[Tool]:
             name="interferometric_sensing",
             description="Fit interference pattern and compute visibility for biosensing. "
                        "Uses lmfit for automatic uncertainty propagation. Returns visibility V = A/(A + 2*C₀) "
-                       "and refractive index shift from phase measurements.",
+                       "and refractive index shift from phase measurements. "
+                       "Supports expert_query for domain-expert parameter suggestions (neuroscience_MRI, physics_optics).",
             inputSchema={
                 "type": "object",
                 "properties": {
@@ -267,6 +317,11 @@ async def list_tools() -> List[Tool]:
                     "visibility_baseline": {
                         "type": "number",
                         "description": "Baseline visibility for Δn computation (required if compute_delta_n=true)"
+                    },
+                    "expert_query": {
+                        "type": "string",
+                        "description": "Optional: Ask domain experts for parameter suggestions before analysis. "
+                                      "Example: 'What sensitivity for GABA detection in neural tissue?'"
                     }
                 },
                 "required": ["position", "intensity"]
@@ -276,7 +331,8 @@ async def list_tools() -> List[Tool]:
             name="lock_in_detection",
             description="Digital lock-in amplification for phase-sensitive detection. "
                        "Extracts signals buried in noise by correlating with reference frequency. "
-                       "Returns I/Q channels, amplitude, and phase.",
+                       "Returns I/Q channels, amplitude, and phase. "
+                       "Supports expert_query for domain-expert guidance (physics_optics, statistics).",
             inputSchema={
                 "type": "object",
                 "properties": {
@@ -308,6 +364,11 @@ async def list_tools() -> List[Tool]:
                         "type": "number",
                         "description": "Target phase in radians for error signal (default: 0.0)",
                         "default": 0.0
+                    },
+                    "expert_query": {
+                        "type": "string",
+                        "description": "Optional: Ask domain experts for guidance. "
+                                      "Example: 'What time constant for detecting 10 Hz neural oscillations?'"
                     }
                 },
                 "required": ["signal", "time", "reference_frequency"]
@@ -316,7 +377,8 @@ async def list_tools() -> List[Tool]:
         Tool(
             name="absorption_spectroscopy",
             description="Measure analyte concentration via Beer-Lambert law: A = ε·c·L. "
-                       "Fits transmission spectrum to determine concentration with uncertainty.",
+                       "Fits transmission spectrum to determine concentration with uncertainty. "
+                       "Supports expert_query for domain-expert guidance (bioengineering_LOC, physics_optics).",
             inputSchema={
                 "type": "object",
                 "properties": {
@@ -342,6 +404,11 @@ async def list_tools() -> List[Tool]:
                     "reference_wavelength": {
                         "type": "number",
                         "description": "Wavelength for concentration measurement in nm (default: peak absorption)"
+                    },
+                    "expert_query": {
+                        "type": "string",
+                        "description": "Optional: Ask domain experts for guidance. "
+                                      "Example: 'What extinction coefficient for hemoglobin at 540nm?'"
                     }
                 },
                 "required": ["wavelength", "transmission"]
@@ -1004,6 +1071,15 @@ async def handle_interferometric_sensing(args: Dict[str, Any]) -> Dict[str, Any]
         from backend.services.sensing_service import InterferometricSensor
         import numpy as np
 
+        # Check for expert query - get domain-expert parameter suggestions
+        expert_response = None
+        expert_query = args.get("expert_query")
+        if expert_query:
+            expert_response = await query_domain_experts(
+                question=expert_query,
+                tool_name="interferometric_sensing"
+            )
+
         # Extract arguments
         position = np.array(args["position"])
         intensity = np.array(args["intensity"])
@@ -1049,6 +1125,11 @@ async def handle_interferometric_sensing(args: Dict[str, Any]) -> Dict[str, Any]
             result["delta_n_uncertainty"] = float(delta_n_stderr)
             result["visibility_baseline"] = float(visibility_baseline)
 
+        # Include expert response if queried
+        if expert_response and expert_response.get("answer"):
+            result["expert_guidance"] = expert_response["answer"]
+            result["expert_collections"] = expert_response.get("collections_queried", [])
+
         return result
 
     except Exception as e:
@@ -1061,6 +1142,15 @@ async def handle_lock_in_detection(args: Dict[str, Any]) -> Dict[str, Any]:
         sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
         from backend.optics.feedback_control import DigitalLockIn
         import numpy as np
+
+        # Check for expert query
+        expert_response = None
+        expert_query = args.get("expert_query")
+        if expert_query:
+            expert_response = await query_domain_experts(
+                question=expert_query,
+                tool_name="lock_in_detection"
+            )
 
         # Extract arguments
         signal_in = np.array(args["signal"])
@@ -1104,6 +1194,11 @@ async def handle_lock_in_detection(args: Dict[str, Any]) -> Dict[str, Any]:
             result["error_signal_std_rad"] = float(np.std(error_signal))
             result["setpoint_phase_rad"] = float(setpoint_phase)
 
+        # Include expert response if queried
+        if expert_response and expert_response.get("answer"):
+            result["expert_guidance"] = expert_response["answer"]
+            result["expert_collections"] = expert_response.get("collections_queried", [])
+
         return result
 
     except Exception as e:
@@ -1114,6 +1209,15 @@ async def handle_absorption_spectroscopy(args: Dict[str, Any]) -> Dict[str, Any]
     """Measure analyte concentration via Beer-Lambert law."""
     try:
         import numpy as np
+
+        # Check for expert query
+        expert_response = None
+        expert_query = args.get("expert_query")
+        if expert_query:
+            expert_response = await query_domain_experts(
+                question=expert_query,
+                tool_name="absorption_spectroscopy"
+            )
 
         # Extract arguments
         wavelength = np.array(args["wavelength"])
@@ -1161,6 +1265,11 @@ async def handle_absorption_spectroscopy(args: Dict[str, Any]) -> Dict[str, Any]
             result["extinction_coefficient_M_cm"] = epsilon
         else:
             result["note"] = "Provide extinction_coefficient to compute concentration"
+
+        # Include expert response if queried
+        if expert_response and expert_response.get("answer"):
+            result["expert_guidance"] = expert_response["answer"]
+            result["expert_collections"] = expert_response.get("collections_queried", [])
 
         return result
 
