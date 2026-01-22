@@ -38,6 +38,21 @@ Source: Egan, Fellows, Rosamond, Shaw paper on k-star augmentation
 
 ---
 
+## Bug Fixes and Optimizations
+
+### Memory Optimization (2026-01-22, commit 6e200c7)
+**Issue**: Tripartite P3 cover algorithm materialized ALL paths in memory
+- For brain-sized graphs: O(|A| × |B| × |C|) paths = millions of (a,b,c) tuples
+- Caused memory footprint issues during testing
+
+**Fix**: Use lookup dict instead of path materialization
+- Build `a_to_c_reachable[a]` = set of reachable c nodes (O(|A| × |C|))
+- Greedy algorithm uses set intersection for coverage
+- Only reconstruct paths for final cover set (much smaller)
+- **Memory reduction**: millions of paths → thousands of reachability pairs
+
+---
+
 ## Files Created This Session
 
 ### Core Implementation
