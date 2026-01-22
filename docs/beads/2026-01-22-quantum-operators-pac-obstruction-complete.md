@@ -40,7 +40,7 @@ Source: Egan, Fellows, Rosamond, Shaw paper on k-star augmentation
 
 ## Bug Fixes and Optimizations
 
-### Memory Optimization (2026-01-22, commit 6e200c7)
+### Memory Optimization 1: Tripartite P3 Cover (2026-01-22, commit 6e200c7)
 **Issue**: Tripartite P3 cover algorithm materialized ALL paths in memory
 - For brain-sized graphs: O(|A| × |B| × |C|) paths = millions of (a,b,c) tuples
 - Caused memory footprint issues during testing
@@ -50,6 +50,18 @@ Source: Egan, Fellows, Rosamond, Shaw paper on k-star augmentation
 - Greedy algorithm uses set intersection for coverage
 - Only reconstruct paths for final cover set (much smaller)
 - **Memory reduction**: millions of paths → thousands of reachability pairs
+
+### Memory Optimization 2: Euler GNN Training Pairs (2026-01-22, merge2docs commit b6de32b6)
+**Issue**: GNN Euler embedding stored full one-hot vectors for training pairs
+- For N=368, 10K walk steps: 10,000 × 2 × 368 × 8 bytes = ~58MB
+- Long Euler tours on brain-sized graphs caused memory explosion
+
+**Fix**: Store indices instead of full vectors
+- Changed `training_pairs` from `List[Tuple[np.ndarray, np.ndarray]]` to `List[Tuple[int, List[int]]]`
+- Store `(vertex_idx, neighbor_indices)` instead of one-hot vectors
+- Reconstruct vectors on-demand during embedding computation
+- Fixed neighbor averaging to use sum loop instead of list comprehension
+- **Memory reduction**: 58MB → ~160KB (360× reduction)
 
 ---
 
