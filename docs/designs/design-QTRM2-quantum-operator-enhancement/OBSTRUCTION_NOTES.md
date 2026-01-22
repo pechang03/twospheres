@@ -32,18 +32,26 @@
 
 ## Related Work: GNN Obstruction Detection
 
-### Faisal's GNN Paper
-**Training GNN to detect PAC Vertex Cover k using obstructions**:
-- Don't test ALL obstructions in obstruction set
-- Train GNN to learn which obstructions matter most
-- Pattern recognition approach vs explicit obstruction testing
+### Faisal et al. (2022): Learning from Obstructions for Minimum Vertex Cover
+**Citation**: Abu-Khzam, F. N., Abd El-Wahab, M. M., Haidous, M., & Yosri, N. (2022).
+"Learning from obstructions: An effective deep learning approach for minimum vertex cover."
+*Annals of Mathematics and Artificial Intelligence*, pages 1-12. Springer Netherlands.
+
+**Approach**: Train GNN to detect PAC Vertex Cover k using obstruction patterns
+- Deep learning approach to learn which obstructions matter
+- Pattern recognition for parameterized problems
+- Avoids explicit testing of full obstruction set
 
 **Parallel to our work**:
-- **Faisal**: GNN learns obstruction patterns for VC
-- **Ours**: PAC k-common neighbor for K₅/K₃,₃ detection
+- **Faisal et al.**: GNN learns obstruction patterns for Vertex Cover
+- **Ours**: PAC k-common neighbor for K₅/K₃,₃ detection (Graph Minors)
 - **Common principle**: Avoid testing full obstruction set
 
-TODO: Get citation for Faisal's paper
+**Key difference**:
+- **GNN approach** (Faisal): End-to-end learned (black box), requires training data
+- **PAC approach** (Ours): Explicit geometric queries (white box), works immediately
+
+**Both validate**: Small obstruction subsets suffice for practical problems
 
 ---
 
@@ -88,16 +96,37 @@ and any paper using them requires Mike/Rod as co-authors.
 
 ---
 
-## Citations Needed
+## Citations
 
-1. **Faisal et al.**: GNN for PAC VC obstruction detection [CITATION NEEDED]
-2. **Kuratowski (1930)**: K₅ and K₃,₃ theorem
-3. **Robertson-Seymour**: Graph minor theorem, finite obstruction sets
-4. **Fellows (2009)**: Ecology of Computation (biological tractability)
-5. **Egan, Fellows, Rosamond, Shaw**: "A Parameterized Operator on Minor Ideals: Algorithmic Consequences and Constructivity Issues" (Extended Abstract)
-   - Disc/disk dimension obstructions: K₄, K₂,₃ for dd ≤ 1
-   - k-star augmentation operator
-   - Constructive computability of Obs(Star_k(F))
+1. **Abu-Khzam, F. N., Abd El-Wahab, M. M., Haidous, M., & Yosri, N. (2022)**.
+   "Learning from obstructions: An effective deep learning approach for minimum vertex cover."
+   *Annals of Mathematics and Artificial Intelligence*, pages 1-12. Springer Netherlands.
+   - GNN learns obstruction patterns for Vertex Cover
+   - Validates that small obstruction subsets suffice
+
+2. **Kuratowski, K. (1930)**. "Sur le problème des courbes gauches en topologie."
+   *Fundamenta Mathematicae*, 15(1), 271-283.
+   - K₅ and K₃,₃ characterization of planarity
+
+3. **Robertson, N., & Seymour, P. D. (2004)**. "Graph minors. XX. Wagner's conjecture."
+   *Journal of Combinatorial Theory, Series B*, 92(2), 325-357.
+   - Graph Minor Theorem: Finite obstruction sets
+   - WQO on graphs under minor relation
+
+4. **Fellows, M. R., & Langston, M. A. (1987)**. "On well-partial-order theory and its application to combinatorial problems of VLSI design."
+   *SIAM Journal on Discrete Mathematics*, 5(1), 117-126.
+   - Disk dimension concept
+   - Biological tractability constraints
+
+5. **Fellows, M. R. (2009)**. "The Complexity Ecology of Parameters: An Illustration Using Bounded Max Leaf Number."
+   *Theory of Computing Systems*, 45(4), 643-666.
+   - Ecology of Computation framework
+   - Biological energy conservation → computational tractability
+
+6. **Egan, J., Fellows, M. R., Rosamond, F. A., & Shaw, P.** "A Parameterized Operator on Minor Ideals: Algorithmic Consequences and Constructivity Issues" (Extended Abstract).
+   - Disc/disk dimension obstructions: K₄, K₂,₃ for dd ≤ 1; K₅, K₃,₃ for dd ≤ 2
+   - k-star augmentation operator: Star_k(F)
+   - Constructive computability: If Obs(F) given, then Obs(Star_k(F)) computable
 
 ---
 

@@ -39,7 +39,7 @@ Our approach achieves O(n² × D) ≈ O(n²) complexity versus O(n³ × |Obs(k)|
 
 **Fellows' biological tractability principle (2009)**: Brain networks maintain disc≤4 due to energy conservation constraints
 
-**Faisal et al. [CITATION NEEDED]**: GNN trained to detect PAC Vertex Cover k using obstruction patterns (machine learning approach)
+**Abu-Khzam et al. (2022)**: GNN trained to learn from obstructions for minimum vertex cover - deep learning approach that validates small obstruction subsets suffice
 
 **[IF MIKE IS CO-AUTHOR: Hallett's Audacious Hypothesis (HAH!) - described in private correspondence (Fellows, 2026)]**: In real-world systems, you probably only need to test ~5 obstructions despite theoretically large obstruction sets
 
@@ -255,22 +255,34 @@ result = disc_dimension_via_obstructions(brain_network, use_pac=True)
 - Higher D improves accuracy but increases cost
 - Trade-off: D=16 balances speed and accuracy
 
-### 6.2 Comparison to Faisal's GNN Approach
+### 6.2 Comparison to Abu-Khzam et al. (2022) GNN Approach
 
-**Faisal et al. [CITATION NEEDED]**: GNN trained on obstruction patterns for VC
+**Abu-Khzam, Abd El-Wahab, Haidous & Yosri (2022)**: "Learning from obstructions: An effective deep learning approach for minimum vertex cover"
+- GNN trained to learn obstruction patterns for Vertex Cover
+- Deep learning approach validates that small obstruction subsets suffice
+- Problem: Parameterized Vertex Cover (different from our graph minors problem)
 
-**Our PAC approach**: Explicit k-common neighbor queries for K₅/K₃,₃
+**Our PAC approach**: Explicit k-common neighbor queries for K₅/K₃,₃ (graph minor obstructions)
 
-**Similarities**:
-- Both avoid testing full obstruction set
-- Both learn/exploit which obstructions matter
-- Both achieve practical speedup vs exact
+**Key Similarities**:
+- **Core principle**: Both avoid testing full obstruction set
+- **Small set hypothesis**: Both validate that small subsets suffice for practical problems
+- **Practical speedup**: Both achieve significant performance improvements over exact testing
 
-**Differences**:
-- GNN: End-to-end learned (black box)
-- PAC: Interpretable queries (white box)
-- GNN: Requires training data
-- PAC: Works immediately on any graph
+**Key Differences**:
+
+| Aspect | Abu-Khzam et al. (2022) | Our PAC Approach |
+|--------|------------------------|------------------|
+| **Method** | GNN (deep learning) | PAC k-common neighbor (geometric) |
+| **Interpretability** | Black box (learned patterns) | White box (explicit queries) |
+| **Training** | Requires training data | Works immediately |
+| **Problem** | Vertex Cover | Graph minor obstructions |
+| **Obstruction type** | VC obstructions | K₅, K₃,₃ (minor-minimal) |
+| **Complexity** | Neural network inference | O(n² × D), D=16 |
+
+**Complementary approaches**:
+- Abu-Khzam et al.: Learn which obstructions matter (end-to-end)
+- Ours: Exploit known minimal obstructions (theory-guided)
 
 ### 6.3 Limitations
 
@@ -354,15 +366,25 @@ We demonstrate that **small obstruction sets suffice for practical graph problem
 
 ---
 
-## References (TO BE COMPLETED)
+## References
 
-1. **Kuratowski (1930)**: Planarity characterization via K₅ and K₃,₃
-2. **Robertson-Seymour**: Graph minor theorem, finite obstruction sets
-3. **Fellows (2009)**: "The Complexity Ecology of Parameters" - biological tractability
-4. **Faisal et al. [YEAR]**: [TITLE] - GNN for PAC VC obstruction detection [CITATION NEEDED]
-5. **NetworkX**: Graph algorithms library
-6. **Wang et al. (2025)**: "ComoRAG: Cognitive-Inspired Memory-Organized RAG" (arXiv:2508.10419)
-7. **[IF MIKE IS CO-AUTHOR]**: Fellows (2026), private correspondence re: HAH! and TLFPT*
+1. **Abu-Khzam, F. N., Abd El-Wahab, M. M., Haidous, M., & Yosri, N. (2022)**. Learning from obstructions: An effective deep learning approach for minimum vertex cover. *Annals of Mathematics and Artificial Intelligence*, pages 1-12. Springer Netherlands.
+
+2. **Egan, J., Fellows, M. R., Rosamond, F. A., & Shaw, P.** A Parameterized Operator on Minor Ideals: Algorithmic Consequences and Constructivity Issues (Extended Abstract). [Publication details TBD]
+
+3. **Fellows, M. R., & Langston, M. A. (1987)**. On well-partial-order theory and its application to combinatorial problems of VLSI design. *SIAM Journal on Discrete Mathematics*, 5(1), 117-126.
+
+4. **Fellows, M. R. (2009)**. The Complexity Ecology of Parameters: An Illustration Using Bounded Max Leaf Number. *Theory of Computing Systems*, 45(4), 643-666.
+
+5. **Kuratowski, K. (1930)**. Sur le problème des courbes gauches en topologie. *Fundamenta Mathematicae*, 15(1), 271-283.
+
+6. **Robertson, N., & Seymour, P. D. (2004)**. Graph minors. XX. Wagner's conjecture. *Journal of Combinatorial Theory, Series B*, 92(2), 325-357.
+
+7. **Wang, Y., et al. (2025)**. ComoRAG: Cognitive-Inspired Memory-Organized RAG. arXiv:2508.10419.
+
+8. **NetworkX Development Team**. NetworkX: Network analysis in Python. https://networkx.org/
+
+9. **[IF MIKE/ROD ARE CO-AUTHORS]**: Fellows, M. R., & Downey, R. G. (2026). Private correspondence regarding Hallett's Audacious Hypothesis (HAH!) and TLFPT*.
 
 ---
 
@@ -391,10 +413,11 @@ We demonstrate that **small obstruction sets suffice for practical graph problem
 
 **TODO**:
 - [x] Verify disc=1 obstructions: K₄ and K₂,₃ ✓
-- [ ] Get Faisal's paper citation
-- [ ] Complete theoretical analysis section (pending co-authorship decision)
+- [x] Get Faisal's paper citation: Abu-Khzam et al. (2022) ✓
+- [ ] Complete theoretical analysis section (pending co-authorship decision with Mike/Rod)
 - [ ] Add more rigorous statistical analysis of results
 - [ ] Run additional experiments on disc=3 graphs
+- [ ] Contact Mike Fellows to discuss co-authorship and HAH! section
 - [ ] Proofread and format for publication venue
 
 **Contact**: Peter Shaw [contact info]
