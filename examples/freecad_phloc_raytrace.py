@@ -92,7 +92,10 @@ pdms_inject_in = fiber_in_diameter * 1.45   # ~72.5 µm
 pdms_inject_out = fiber_out_diameter * 1.45  # ~145 µm
 
 # Microfluidic channels (mm)
-microchannel_diameter = 0.010  # 10 µm channels
+# 100µm channels for organoid-safe shear stress (< 0.5 Pa)
+# Multiple parallel channels distribute flow for gentler delivery
+microchannel_diameter = 0.100  # 100 µm channels (was 10µm - too high shear)
+n_parallel_channels = 3  # 3 parallel channels for laminar flow distribution
 
 # Lens parameters (scaled for small chamber)
 lens_radius = 0.5  # 1mm diameter ball lens
@@ -169,13 +172,47 @@ chip = chip.cut(opt_ch2)
 
 # ============================================
 # Central organoid chamber (1.5 x 1 x 1 mm = 1.5 µL)
+# Chamber should be ~2x max organoid size for viability
 # ============================================
 chamber = Part.makeBox(chamber_length, chamber_width, chamber_height,
                        Vector(-chamber_length/2, -chamber_width/2, optical_z - chamber_height/2))
 chip = chip.cut(chamber)
 
 # ============================================
-# Microfluidic system (10 µm channels)
+# Micro-wells (hemispherical) at chamber bottom
+# Encourage spheroid formation, prevent lateral spreading
+# Well diameter ~500µm for ~250µm organoids
+# ============================================
+microwell_r = 0.25  # 250µm radius = 500µm diameter wells
+microwell_spacing = 0.6  # 600µm center-to-center
+n_wells_x = 2
+n_wells_y = 1
+
+for ix in range(n_wells_x):
+    for iy in range(n_wells_y):
+        well_x = -microwell_spacing/2 + ix * microwell_spacing
+        well_y = 0
+        well_z = optical_z - chamber_height/2  # Bottom of chamber
+        # Hemispherical depression
+        well = Part.makeSphere(microwell_r, Vector(well_x, well_y, well_z))
+        chip = chip.cut(well)
+
+# ============================================
+# Temperature sensor port
+# Small channel for thermocouple/RTD probe (maintain 37°C)
+# ============================================
+temp_sensor_d = 0.5  # 500µm channel for sensor probe
+temp_sensor_depth = chip_height - optical_z + chamber_height/2 - 0.5  # Near chamber
+temp_sensor_x = 0  # Center
+temp_sensor_y = -chip_width/2 + 1.0  # From side, avoiding optical path
+
+temp_channel = Part.makeCylinder(temp_sensor_d/2, temp_sensor_depth,
+                                  Vector(temp_sensor_x, temp_sensor_y, chip_height - temp_sensor_depth),
+                                  Vector(0, 0, 1))
+chip = chip.cut(temp_channel)
+
+# ============================================
+# Microfluidic system (50-100 µm channels for organoid-safe shear)
 # BOTH fluid ports on TOP of chip
 # Internal channels route to chamber from ABOVE and BELOW
 # ============================================
@@ -201,48 +238,61 @@ res_out = Part.makeCylinder(reservoir_r, reservoir_depth,
 chip = chip.cut(res_out)
 
 # ============================================
-# 10 µm microchannels routing to CHAMBER (not lenses!)
-# Input: TOP reservoir -> down -> horizontal -> enters chamber from ABOVE
-# Output: chamber BELOW -> horizontal -> up -> TOP reservoir
+# 100 µm microchannels routing to CHAMBER
+# Multiple parallel channels for gentle laminar flow distribution
+# Input: TOP reservoir -> down -> splits to N parallel -> enters chamber from ABOVE
+# Output: chamber BELOW -> merges from N parallel -> up -> TOP reservoir
 # ============================================
 
-# --- INPUT CHANNEL: enters chamber from ABOVE ---
-# Vertical down from reservoir
-micro_in_v1 = Part.makeCylinder(microchannel_diameter/2,
-                                 chip_height - reservoir_depth - (optical_z + chamber_height/2) - 0.2,
-                                 Vector(res_in_x, res_in_y, optical_z + chamber_height/2 + 0.3),
-                                 Vector(0, 0, 1))
-chip = chip.cut(micro_in_v1)
+# Channel spacing across chamber width
+channel_spacing = chamber_width / (n_parallel_channels + 1)
 
-# Horizontal toward chamber (in Y direction)
-micro_in_h = Part.makeCylinder(microchannel_diameter/2,
-                                abs(res_in_y) - chamber_width/2 + 0.1,
-                                Vector(res_in_x, chamber_width/2 - 0.1, optical_z + chamber_height/2 + 0.3),
-                                Vector(0, 1, 0))
-chip = chip.cut(micro_in_h)
+# --- INPUT CHANNELS: enter chamber from ABOVE (multiple parallel) ---
+for i in range(n_parallel_channels):
+    channel_y = -chamber_width/2 + (i + 1) * channel_spacing
 
-# Short vertical into chamber top
-micro_in_v2 = Part.makeCylinder(microchannel_diameter/2, 0.4,
-                                 Vector(res_in_x, 0, optical_z + chamber_height/2 - 0.1),
-                                 Vector(0, 0, 1))
-chip = chip.cut(micro_in_v2)
+    # Vertical down from reservoir level
+    micro_in_v1 = Part.makeCylinder(microchannel_diameter/2,
+                                     chip_height - reservoir_depth - (optical_z + chamber_height/2) - 0.2,
+                                     Vector(res_in_x, res_in_y, optical_z + chamber_height/2 + 0.3),
+                                     Vector(0, 0, 1))
+    if i == 0:  # Only cut main vertical once
+        chip = chip.cut(micro_in_v1)
 
-# --- OUTPUT CHANNEL: exits chamber from BELOW ---
-# Vertical down from chamber bottom
-micro_out_v1 = Part.makeCylinder(microchannel_diameter/2,
-                                  optical_z - chamber_height/2,
-                                  Vector(res_out_x, 0, 0),
-                                  Vector(0, 0, 1))
-chip = chip.cut(micro_out_v1)
+    # Horizontal branch toward chamber (spreads to parallel positions)
+    branch_len = abs(res_in_y - channel_y)
+    micro_in_h = Part.makeCylinder(microchannel_diameter/2,
+                                    branch_len,
+                                    Vector(res_in_x, channel_y, optical_z + chamber_height/2 + 0.3),
+                                    Vector(0, 1, 0))
+    chip = chip.cut(micro_in_h)
 
-# Horizontal toward reservoir Y position
-micro_out_h = Part.makeCylinder(microchannel_diameter/2,
-                                 abs(res_out_y) - 0.1,
-                                 Vector(res_out_x, 0, 0.5),
-                                 Vector(0, 1, 0))
-chip = chip.cut(micro_out_h)
+    # Vertical into chamber top
+    micro_in_v2 = Part.makeCylinder(microchannel_diameter/2, 0.5,
+                                     Vector(res_in_x, channel_y, optical_z + chamber_height/2 - 0.1),
+                                     Vector(0, 0, 1))
+    chip = chip.cut(micro_in_v2)
 
-# Vertical up to reservoir
+# --- OUTPUT CHANNELS: exit chamber from BELOW (multiple parallel) ---
+for i in range(n_parallel_channels):
+    channel_y = -chamber_width/2 + (i + 1) * channel_spacing
+
+    # Vertical down from chamber bottom
+    micro_out_v1 = Part.makeCylinder(microchannel_diameter/2,
+                                      optical_z - chamber_height/2,
+                                      Vector(res_out_x, channel_y, 0),
+                                      Vector(0, 0, 1))
+    chip = chip.cut(micro_out_v1)
+
+    # Horizontal merge toward reservoir Y position
+    branch_len = abs(res_out_y - channel_y)
+    micro_out_h = Part.makeCylinder(microchannel_diameter/2,
+                                     branch_len,
+                                     Vector(res_out_x, channel_y, 0.5),
+                                     Vector(0, 1, 0))
+    chip = chip.cut(micro_out_h)
+
+# Main vertical up to output reservoir
 micro_out_v2 = Part.makeCylinder(microchannel_diameter/2,
                                   chip_height - reservoir_depth - 0.5,
                                   Vector(res_out_x, res_out_y, 0.5),
@@ -309,11 +359,13 @@ FreeCADGui.ActiveDocument.ActiveView.viewIsometric()
 print("PHLoC Organoid Chip created!")
 print(f"  Chip: {chip_length} x {chip_width} x {chip_height} mm")
 print(f"  Chamber: {chamber_length} x {chamber_width} x {chamber_height} mm = {chamber_volume_uL:.1f} µL")
+print(f"  Micro-wells: {n_wells_x}x{n_wells_y} hemispherical ({microwell_r*2*1000:.0f}µm) for spheroid formation")
 print(f"  Ball lenses: {lens_radius * 2} mm diameter")
 print(f"  Fiber input: {fiber_in_diameter * 1000:.0f} µm (single-mode)")
 print(f"  Fiber output: {fiber_out_diameter * 1000:.0f} µm (multi-mode)")
-print(f"  Microchannels: {microchannel_diameter * 1000:.0f} µm (to chamber above/below)")
-print(f"  PDMS injection: {pdms_inject_in * 1000:.0f} µm in, {pdms_inject_out * 1000:.0f} µm out (at fiber ends)")
+print(f"  Microchannels: {n_parallel_channels}x {microchannel_diameter * 1000:.0f} µm parallel (gentle laminar flow)")
+print(f"  Temperature port: {temp_sensor_d * 1000:.0f} µm (for 37C monitoring)")
+print(f"  PDMS injection: {pdms_inject_in * 1000:.0f} µm in, {pdms_inject_out * 1000:.0f} µm out")
 '''
 
     result = server.execute_code(code)
