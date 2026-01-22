@@ -208,16 +208,18 @@ class TripartiteMultiplexAnalyzer:
             C_nodes = {n for n, d in G_tripartite.nodes(data=True)
                       if d.get('tripartite') == 2}
 
-            # Find all P3 paths: a → b → c
-            p3_paths = []
+            # Build adjacency structure for efficient P3 path queries
+            # Instead of materializing all paths, build a lookup: a -> {c reachable via P3}
+            a_to_c_reachable = {}
             for a in A_nodes:
+                reachable_c = set()
                 b_neighbors = set(G_tripartite.neighbors(a)) & B_nodes
                 for b in b_neighbors:
                     c_neighbors = set(G_tripartite.neighbors(b)) & C_nodes
-                    for c in c_neighbors:
-                        p3_paths.append((a, b, c))
+                    reachable_c.update(c_neighbors)
+                a_to_c_reachable[a] = reachable_c
 
-            # Greedy cover algorithm
+            # Greedy cover algorithm (memory-efficient)
             a_cover_set = set()
             c_covered = set()
             c_uncovered = C_nodes.copy()
@@ -229,10 +231,7 @@ class TripartiteMultiplexAnalyzer:
 
                 for a in A_nodes - a_cover_set:
                     # Count how many uncovered c this a can reach
-                    reachable_c = set()
-                    for path_a, path_b, path_c in p3_paths:
-                        if path_a == a and path_c in c_uncovered:
-                            reachable_c.add(path_c)
+                    reachable_c = a_to_c_reachable[a] & c_uncovered
 
                     if len(reachable_c) > best_coverage:
                         best_a = a
@@ -245,10 +244,18 @@ class TripartiteMultiplexAnalyzer:
                 a_cover_set.add(best_a)
 
                 # Mark c nodes as covered
-                for path_a, path_b, path_c in p3_paths:
-                    if path_a == best_a and path_c in c_uncovered:
-                        c_covered.add(path_c)
-                        c_uncovered.discard(path_c)
+                newly_covered = a_to_c_reachable[best_a] & c_uncovered
+                c_covered.update(newly_covered)
+                c_uncovered -= newly_covered
+
+            # Reconstruct p3_paths for result (only for nodes in cover)
+            p3_paths = []
+            for a in a_cover_set:
+                b_neighbors = set(G_tripartite.neighbors(a)) & B_nodes
+                for b in b_neighbors:
+                    c_neighbors = set(G_tripartite.neighbors(b)) & C_nodes
+                    for c in c_neighbors & c_covered:
+                        p3_paths.append((a, b, c))
 
             coverage_percentage = len(c_covered) / len(C_nodes) if C_nodes else 0
 
