@@ -714,6 +714,119 @@ async def list_tools() -> List[Tool]:
                 "required": []
             }
         ),
+        # =====================================================================
+        # Glymphatic/Microfluidic Simulation Tools (PH-7)
+        # =====================================================================
+        Tool(
+            name="simulate_perivascular_flow",
+            description="Simulate CSF flow in brain perivascular spaces (glymphatic system). "
+                       "Uses Stokes flow physics (Re << 1) - same as PHLoC microfluidics. "
+                       "Supports expert_query for domain guidance (neuroscience_MRI, bioengineering_LOC).",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "vessel_radius_um": {
+                        "type": "number",
+                        "description": "Blood vessel radius in µm (typical: 10-100 for arteries)",
+                        "default": 50
+                    },
+                    "gap_thickness_um": {
+                        "type": "number",
+                        "description": "Perivascular space width in µm (typical: 3-50)",
+                        "default": 20
+                    },
+                    "length_mm": {
+                        "type": "number",
+                        "description": "Vessel segment length in mm",
+                        "default": 5
+                    },
+                    "pressure_gradient_Pa_m": {
+                        "type": "number",
+                        "description": "Pressure gradient in Pa/m (typical: 1-100)",
+                        "default": 10
+                    },
+                    "state": {
+                        "type": "string",
+                        "description": "Brain state: 'awake' or 'sleep' (affects clearance ~60%)",
+                        "enum": ["awake", "sleep"],
+                        "default": "awake"
+                    },
+                    "pulsatile": {
+                        "type": "boolean",
+                        "description": "If true, simulate cardiac-driven pulsatile flow",
+                        "default": False
+                    },
+                    "expert_query": {
+                        "type": "string",
+                        "description": "Optional: Ask domain experts. Example: 'What pressure gradient for cortical arteries?'"
+                    }
+                },
+                "required": []
+            }
+        ),
+        Tool(
+            name="analyze_clearance_network",
+            description="Analyze brain network topology for waste clearance efficiency. "
+                       "Links disc dimension (graph embedding) to glymphatic clearance prediction. "
+                       "Based on Paul et al. 2023 obstruction theory: pobs(tw) = {K₅, K₃,₃}. "
+                       "Supports expert_query for domain guidance.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "adjacency_matrix": {
+                        "type": "array",
+                        "items": {"type": "array", "items": {"type": "number"}},
+                        "description": "N×N adjacency matrix (symmetric, 0/1 or weighted)"
+                    },
+                    "network_name": {
+                        "type": "string",
+                        "description": "Optional name for the network",
+                        "default": "brain_network"
+                    },
+                    "optimal_disc_dimension": {
+                        "type": "number",
+                        "description": "Optimal disc dimension for clearance (default: 2.5)",
+                        "default": 2.5
+                    },
+                    "expert_query": {
+                        "type": "string",
+                        "description": "Optional: Ask domain experts. Example: 'What network topology optimizes glymphatic flow?'"
+                    }
+                },
+                "required": ["adjacency_matrix"]
+            }
+        ),
+        Tool(
+            name="design_brain_chip_channel",
+            description="Design microfluidic channel that mimics brain perivascular conditions. "
+                       "Matches physiological shear stress (0.03-0.15 Pa) and residence time. "
+                       "Supports expert_query for domain guidance (bioengineering_LOC, neuroscience_MRI).",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "target_shear_Pa": {
+                        "type": "number",
+                        "description": "Target wall shear stress in Pa (physiological: 0.03-0.15)",
+                        "default": 0.1
+                    },
+                    "target_residence_time_s": {
+                        "type": "number",
+                        "description": "Target fluid residence time in seconds",
+                        "default": 60
+                    },
+                    "length_mm": {
+                        "type": "number",
+                        "description": "Channel length in mm",
+                        "default": 10
+                    },
+                    "expert_query": {
+                        "type": "string",
+                        "description": "Optional: Ask domain experts. Example: 'What shear stress for neural cell culture?'"
+                    }
+                },
+                "required": []
+            }
+        ),
     ]
 
 
@@ -757,6 +870,12 @@ async def call_tool(name: str, arguments: Dict[str, Any]) -> List[TextContent]:
             result = await handle_simulate_loc_chip(arguments)
         elif name == "cfd_microfluidics":
             result = await handle_cfd_microfluidics(arguments)
+        elif name == "simulate_perivascular_flow":
+            result = await handle_simulate_perivascular_flow(arguments)
+        elif name == "analyze_clearance_network":
+            result = await handle_analyze_clearance_network(arguments)
+        elif name == "design_brain_chip_channel":
+            result = await handle_design_brain_chip_channel(arguments)
         else:
             result = {"error": f"Unknown tool: {name}"}
 
@@ -1919,6 +2038,170 @@ async def handle_cfd_microfluidics(args: Dict[str, Any]) -> Dict[str, Any]:
             result["freecad_status"] = f"FreeCAD not available: {e}"
 
     return result
+
+
+# =============================================================================
+# Glymphatic/Microfluidic Simulation Handlers (PH-7)
+# =============================================================================
+
+async def handle_simulate_perivascular_flow(args: Dict[str, Any]) -> Dict[str, Any]:
+    """Simulate CSF flow in brain perivascular spaces."""
+    try:
+        from backend.simulation.glymphatic_flow import (
+            GlymphaticFlowSimulator,
+            PerivascularSpace
+        )
+
+        # Check for expert query
+        expert_response = None
+        expert_query = args.get("expert_query")
+        if expert_query:
+            expert_response = await query_domain_experts(
+                question=expert_query,
+                tool_name="microfluidics",
+                collections=["docs_library_bioengineering_LOC", "docs_library_neuroscience_MRI"]
+            )
+
+        # Create perivascular space geometry
+        pvs = PerivascularSpace(
+            vessel_radius_um=args.get("vessel_radius_um", 50),
+            gap_thickness_um=args.get("gap_thickness_um", 20),
+            length_mm=args.get("length_mm", 5),
+            vessel_type="artery"
+        )
+
+        # Initialize simulator with brain state
+        state = args.get("state", "awake")
+        simulator = GlymphaticFlowSimulator(state=state)
+
+        # Run simulation
+        pressure_gradient = args.get("pressure_gradient_Pa_m", 10)
+        pulsatile = args.get("pulsatile", False)
+
+        if pulsatile:
+            result = simulator.compute_pulsatile_flow(
+                pvs=pvs,
+                mean_pressure_gradient=pressure_gradient,
+                pulse_amplitude=0.3,
+                frequency_Hz=1.0,
+                num_cycles=5
+            )
+        else:
+            result = simulator.compute_steady_flow(
+                pvs=pvs,
+                pressure_gradient_Pa_m=pressure_gradient
+            )
+
+        # Add clearance estimate
+        flow_rate = result.get('flow_rate_uL_min', result.get('flow_rate_mean_uL_min', 0))
+        clearance = simulator.estimate_clearance(
+            pvs=pvs,
+            flow_rate_uL_min=flow_rate,
+            solute_name='amyloid-beta'
+        )
+        result['clearance_estimate'] = clearance
+
+        # Include expert response if queried
+        if expert_response and expert_response.get("answer"):
+            result["expert_guidance"] = expert_response["answer"]
+            result["expert_collections"] = expert_response.get("collections_queried", [])
+
+        return result
+
+    except Exception as e:
+        import traceback
+        return {
+            "error": str(e),
+            "traceback": traceback.format_exc(),
+            "tool": "simulate_perivascular_flow"
+        }
+
+
+async def handle_analyze_clearance_network(args: Dict[str, Any]) -> Dict[str, Any]:
+    """Analyze brain network topology for waste clearance prediction."""
+    try:
+        import numpy as np
+        from backend.simulation.clearance_network import ClearanceNetworkAnalyzer
+
+        # Check for expert query
+        expert_response = None
+        expert_query = args.get("expert_query")
+        if expert_query:
+            expert_response = await query_domain_experts(
+                question=expert_query,
+                tool_name="microfluidics",
+                collections=["docs_library_neuroscience_MRI"]
+            )
+
+        # Get adjacency matrix
+        adj_matrix = np.array(args["adjacency_matrix"])
+
+        # Create analyzer
+        optimal_disc = args.get("optimal_disc_dimension", 2.5)
+        analyzer = ClearanceNetworkAnalyzer(optimal_disc_dim=optimal_disc)
+
+        # Analyze network
+        result = analyzer.analyze_network(adj_matrix)
+        result["network_name"] = args.get("network_name", "brain_network")
+
+        # Include expert response if queried
+        if expert_response and expert_response.get("answer"):
+            result["expert_guidance"] = expert_response["answer"]
+            result["expert_collections"] = expert_response.get("collections_queried", [])
+
+        return result
+
+    except Exception as e:
+        import traceback
+        return {
+            "error": str(e),
+            "traceback": traceback.format_exc(),
+            "tool": "analyze_clearance_network"
+        }
+
+
+async def handle_design_brain_chip_channel(args: Dict[str, Any]) -> Dict[str, Any]:
+    """Design microfluidic channel mimicking brain perivascular conditions."""
+    try:
+        from backend.simulation.glymphatic_flow import GlymphaticFlowSimulator
+
+        # Check for expert query
+        expert_response = None
+        expert_query = args.get("expert_query")
+        if expert_query:
+            expert_response = await query_domain_experts(
+                question=expert_query,
+                tool_name="microfluidics",
+                collections=["docs_library_bioengineering_LOC", "docs_library_neuroscience_MRI"]
+            )
+
+        # Get design parameters
+        target_shear = args.get("target_shear_Pa", 0.1)
+        target_residence = args.get("target_residence_time_s", 60)
+        length_mm = args.get("length_mm", 10)
+
+        # Design channel
+        simulator = GlymphaticFlowSimulator()
+        result = simulator.design_brain_chip_channel(
+            target_shear_Pa=target_shear,
+            target_residence_time_s=target_residence,
+            length_mm=length_mm
+        )
+
+        # Include expert response if queried
+        if expert_response and expert_response.get("answer"):
+            result["expert_guidance"] = expert_response["answer"]
+            result["expert_collections"] = expert_response.get("collections_queried", [])
+
+        return result
+
+    except Exception as e:
+        import traceback
+        return {
+            "error": str(e),
+            "traceback": traceback.format_exc(),
+            "tool": "design_brain_chip_channel"
+        }
 
 
 # =============================================================================
