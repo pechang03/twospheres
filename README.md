@@ -187,7 +187,8 @@ The two-sphere model provides a geometric framework unifying:
 CAD integration for PHLoC (Photonic Lab-on-Chip) design:
 - Control FreeCAD from Claude Desktop via MCP
 - Design optical components, resonator cavities, microfluidic channels
-- **pyoptools FreeCAD addon** - Direct optical simulation in CAD environment
+- **pyoptools FreeCAD addon** - Direct optical ray tracing in CAD
+- **CfdOF Workbench** - OpenFOAM CFD for microfluidic flow simulation
 - Export to fabrication-ready formats (STEP, STL)
 - **PDMS 3D printing** - 100nm resolution, optically transparent, biocompatible
 
@@ -199,7 +200,12 @@ get_view         # Screenshot feedback
 insert_part_from_library  # Standard optical components
 ```
 
-**Workflow**: Design (FreeCAD) → Simulate (twosphere) → Print (PDMS 100nm) → Test
+**Simulation Workflow**:
+1. **Design** (FreeCAD MCP) - Create PHLoC geometry
+2. **Optical** (pyoptools) - Ray trace through lenses
+3. **Fluidics** (CfdOF/OpenFOAM) - Simulate 10µm channel flow
+4. **Fabricate** (PDMS 100nm) - 3D print chip
+5. **Test** - Organoid culture + optical measurement
 
 **Quick Start** (requires FreeCAD with MCP addon running):
 ```bash
@@ -207,7 +213,7 @@ insert_part_from_library  # Standard optical components
 python examples/freecad_phloc_raytrace.py
 ```
 
-This creates a PHLoC chip with ball lenses and ray traces through it.
+Creates PHLoC chip (1.5µL chamber, 50/100µm fibers, 10µm microfluidics) with ray tracing.
 
 ## Dependencies
 
@@ -217,6 +223,7 @@ This creates a PHLoC chip with ball lenses and ray traces through it.
 - **matplotlib** - Visualization
 - **mcp** - Model Context Protocol
 - **FreeCAD** (optional) - CAD via freecad-mcp
+- **OpenFOAM + CfdOF** (optional) - Microfluidic CFD simulation
 
 ## Task Tracking
 
