@@ -188,7 +188,8 @@ CAD integration for PHLoC (Photonic Lab-on-Chip) design:
 - Control FreeCAD from Claude Desktop via MCP
 - Design optical components, resonator cavities, microfluidic channels
 - **pyoptools FreeCAD addon** - Direct optical simulation in CAD environment
-- Export to fabrication-ready formats
+- Export to fabrication-ready formats (STEP, STL)
+- **PDMS 3D printing** - 100nm resolution, optically transparent, biocompatible
 
 ```bash
 # FreeCAD MCP tools
@@ -198,7 +199,7 @@ get_view         # Screenshot feedback
 insert_part_from_library  # Standard optical components
 ```
 
-**Workflow**: Design in FreeCAD MCP → Simulate in twosphere-mcp → Iterate
+**Workflow**: Design (FreeCAD) → Simulate (twosphere) → Print (PDMS) → Test
 
 ## Dependencies
 
