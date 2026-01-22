@@ -91,6 +91,27 @@ result = disc_dimension_via_obstructions(brain_graph, use_pac=True)
 - `src/backend/mri/quantum_network_operators.py`
 - `src/backend/services/qec_tensor_service.py`
 
+### merge2docs Q Models Integration
+
+twosphere-mcp connects to merge2docs quantum-inspired services:
+
+| merge2docs Model | twosphere Usage | Link |
+|------------------|-----------------|------|
+| **QTRM** (Quantum Tensor Routing) | Tool selection for MCP | `../merge2docs/src/backend/services/lean_qtrm_service.py` |
+| **QEC-ComoRAG** | Error-corrected retrieval | `../merge2docs/src/backend/algorithms/qec_comorag.py` |
+| **Quantum Fourier Features** | FFT-based embeddings | `../merge2docs/src/backend/algorithms/quantum_fourier_features.py` |
+| **Orch-OR GNN** | Neural network inference | `../merge2docs/src/backend/gnn/orchor_gnn.py` |
+| **ernie2_swarm** | Expert knowledge queries | `../merge2docs/bin/ernie2_swarm_mcp_e.py` |
+
+**A-mem Engram** (port 8091) provides O(1) n-gram lookup + tensor routing for all services.
+
+```python
+# Example: Query QTRM for tool routing
+from backend.services.lean_qtrm_service import LeanQTRMService
+qtrm = LeanQTRMService()
+routing = await qtrm.route_query("simulate microfluidic flow", domain_hint="physics")
+```
+
 ## Cross-Domain Connections
 
 | Domain | Shared Tools | Application |
