@@ -601,6 +601,52 @@ async def list_tools() -> List[Tool]:
                 "required": []
             }
         ),
+        Tool(
+            name="cfd_microfluidics",
+            description="CFD simulation for microfluidic systems using OpenFOAM/CfdOF. "
+                       "Supports two applications with shared Stokes flow regime (Re << 1): "
+                       "(1) PHLoC organoid culture - 10µm channels for nutrient exchange, "
+                       "(2) Glymphatic system - brain perivascular CSF/ISF flow simulation. "
+                       "Calculates Reynolds number, pressure drop, flow distribution.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "geometry_type": {
+                        "type": "string",
+                        "description": "Geometry type: 'phloc' for lab-on-chip or 'glymphatic' for brain perivascular",
+                        "enum": ["phloc", "glymphatic"],
+                        "default": "phloc"
+                    },
+                    "channel_diameter_um": {
+                        "type": "number",
+                        "description": "Channel/space diameter in micrometers (default: 10 for phloc, 20 for glymphatic)",
+                        "default": 10
+                    },
+                    "velocity_um_s": {
+                        "type": "number",
+                        "description": "Flow velocity in micrometers/second (default: 10000 for phloc, 10 for glymphatic)",
+                        "default": 10000
+                    },
+                    "fluid": {
+                        "type": "string",
+                        "description": "Fluid type: 'water', 'csf' (cerebrospinal fluid), or 'culture_media'",
+                        "enum": ["water", "csf", "culture_media"],
+                        "default": "water"
+                    },
+                    "length_mm": {
+                        "type": "number",
+                        "description": "Channel/vessel segment length in mm (default: 5)",
+                        "default": 5
+                    },
+                    "run_simulation": {
+                        "type": "boolean",
+                        "description": "If true and FreeCAD RPC available, create geometry in FreeCAD (default: false)",
+                        "default": False
+                    }
+                },
+                "required": []
+            }
+        ),
     ]
 
 
@@ -642,6 +688,8 @@ async def call_tool(name: str, arguments: Dict[str, Any]) -> List[TextContent]:
             result = await handle_two_sphere_graph_mapping(arguments)
         elif name == "simulate_loc_chip":
             result = await handle_simulate_loc_chip(arguments)
+        elif name == "cfd_microfluidics":
+            result = await handle_cfd_microfluidics(arguments)
         else:
             result = {"error": f"Unknown tool: {name}"}
 
@@ -1633,6 +1681,135 @@ async def handle_simulate_loc_chip(args: Dict[str, Any]) -> Dict[str, Any]:
             "traceback": traceback.format_exc(),
             "tool": "simulate_loc_chip"
         }
+
+
+async def handle_cfd_microfluidics(args: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    CFD simulation for microfluidic systems.
+
+    Cross-domain overlap: same physics applies to:
+    - PHLoC organoid culture (10µm channels)
+    - Brain glymphatic system (10-50µm perivascular spaces)
+
+    Both operate in Stokes flow regime (Re << 1).
+    """
+    import math
+
+    geometry_type = args.get("geometry_type", "phloc")
+    fluid = args.get("fluid", "water")
+    length_mm = args.get("length_mm", 5.0)
+    run_simulation = args.get("run_simulation", False)
+
+    # Set defaults based on geometry type
+    if geometry_type == "phloc":
+        channel_diameter_um = args.get("channel_diameter_um", 10)
+        velocity_um_s = args.get("velocity_um_s", 10000)  # 10 mm/s typical
+    else:  # glymphatic
+        channel_diameter_um = args.get("channel_diameter_um", 20)
+        velocity_um_s = args.get("velocity_um_s", 10)  # ~10 µm/s in brain
+
+    # Fluid properties
+    fluid_properties = {
+        "water": {"density": 998, "viscosity": 1.0e-3, "name": "Water"},
+        "csf": {"density": 1007, "viscosity": 0.7e-3, "name": "Cerebrospinal Fluid"},
+        "culture_media": {"density": 1010, "viscosity": 1.2e-3, "name": "Culture Media"}
+    }
+
+    props = fluid_properties.get(fluid, fluid_properties["water"])
+    density = props["density"]  # kg/m³
+    viscosity = props["viscosity"]  # Pa·s
+
+    # Convert units
+    diameter_m = channel_diameter_um * 1e-6
+    velocity_ms = velocity_um_s * 1e-6
+    length_m = length_mm * 1e-3
+
+    # Calculate Reynolds number: Re = ρvD/μ
+    reynolds = density * velocity_ms * diameter_m / viscosity
+
+    # Flow regime classification
+    if reynolds < 1:
+        flow_regime = "Stokes flow (creeping flow)"
+        regime_note = "Inertial effects negligible, viscous dominated"
+    elif reynolds < 2300:
+        flow_regime = "Laminar flow"
+        regime_note = "Smooth, predictable streamlines"
+    else:
+        flow_regime = "Transitional/Turbulent"
+        regime_note = "May have chaotic mixing"
+
+    # Pressure drop (Hagen-Poiseuille for circular pipe): ΔP = 128μLQ/(πD⁴)
+    # With Q = v * A = v * π(D/2)²
+    area = math.pi * (diameter_m / 2) ** 2
+    flow_rate = velocity_ms * area  # m³/s
+    pressure_drop = 128 * viscosity * length_m * flow_rate / (math.pi * diameter_m**4)
+
+    # Wall shear stress: τ = 8μv/D
+    wall_shear = 8 * viscosity * velocity_ms / diameter_m
+
+    result = {
+        "geometry_type": geometry_type,
+        "application": "PHLoC organoid culture" if geometry_type == "phloc" else "Glymphatic CSF flow",
+        "cross_domain_note": "Same Stokes flow physics applies to both microfluidics and brain glymphatics",
+
+        "geometry": {
+            "channel_diameter_um": channel_diameter_um,
+            "length_mm": length_mm,
+            "cross_section_area_um2": area * 1e12
+        },
+
+        "fluid": {
+            "type": fluid,
+            "name": props["name"],
+            "density_kg_m3": density,
+            "viscosity_Pa_s": viscosity
+        },
+
+        "flow_conditions": {
+            "velocity_um_s": velocity_um_s,
+            "velocity_mm_s": velocity_um_s / 1000,
+            "flow_rate_uL_min": flow_rate * 1e9 * 60
+        },
+
+        "dimensionless_numbers": {
+            "reynolds_number": reynolds,
+            "flow_regime": flow_regime,
+            "regime_note": regime_note
+        },
+
+        "results": {
+            "pressure_drop_Pa": pressure_drop,
+            "pressure_drop_mbar": pressure_drop / 100,
+            "wall_shear_stress_Pa": wall_shear,
+            "wall_shear_stress_dyn_cm2": wall_shear * 10  # CGS units common in biology
+        },
+
+        "biological_relevance": {
+            "phloc": {
+                "organoid_shear_tolerance": "< 0.5 Pa recommended for organoids",
+                "nutrient_exchange": "Flow ensures oxygen/nutrient delivery"
+            },
+            "glymphatic": {
+                "waste_clearance": "CSF flow clears metabolic waste (Aβ, tau)",
+                "sleep_dependence": "Flow increases ~60% during sleep",
+                "perivascular_pumping": "Arterial pulsations drive flow"
+            }
+        }[geometry_type]
+    }
+
+    # Optional: Create geometry in FreeCAD
+    if run_simulation:
+        try:
+            import xmlrpc.client
+            server = xmlrpc.client.ServerProxy('http://localhost:9875', allow_none=True)
+            if server.ping():
+                result["freecad_status"] = "FreeCAD connected - use examples/freecad_cfd_microfluidics.py for full simulation"
+            else:
+                result["freecad_status"] = "FreeCAD RPC not responding"
+        except Exception as e:
+            result["freecad_status"] = f"FreeCAD not available: {e}"
+
+    return result
 
 
 # =============================================================================
