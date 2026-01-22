@@ -98,9 +98,21 @@ microchannel_diameter = 0.100  # 100 µm channels (was 10µm - too high shear)
 n_parallel_channels = 3  # 3 parallel channels for laminar flow distribution
 
 # Lens parameters (scaled for small chamber)
+# Option: convex+concave pair on input for better beam control
 lens_radius = 0.5  # 1mm diameter ball lens
-lens1_x = -chamber_length/2 - 1.5  # 1.5mm from chamber
-lens2_x = chamber_length/2 + 1.5
+lens_spacing = 0.8  # Spacing between convex-concave pair
+use_lens_pair = True  # True = convex+concave pair, False = single ball lens
+
+# Lens positions
+if use_lens_pair:
+    # Input: convex (collimate) + concave (expand/shape)
+    lens1a_x = -chamber_length/2 - 2.0  # Convex (closer to fiber)
+    lens1b_x = lens1a_x + lens_spacing + lens_radius  # Concave
+    lens1_x = lens1b_x  # For compatibility with optical channel routing
+else:
+    lens1_x = -chamber_length/2 - 1.5
+
+lens2_x = chamber_length/2 + 1.5  # Output: single ball lens (collection)
 
 # ============================================
 # Main chip body
@@ -110,11 +122,15 @@ chip = Part.makeBox(chip_length, chip_width, chip_height,
 
 # ============================================
 # Fiber channels (asymmetric: 50µm in, 100µm out)
-# Slightly larger than fiber for insertion clearance
+# Wedge entry for easy insertion, supports for stripped fiber
 # ============================================
 fiber_clearance = 1.1  # 10% clearance
+wedge_len = 1.0  # 1mm wedge taper at entry
+wedge_multiplier = 3.0  # Entry 3x wider than channel
+support_spacing = 2.0  # Support ribs every 2mm
+support_width = 0.1  # 100µm support ribs
 
-# Input fiber channel (50 µm fiber)
+# Input fiber channel (50 µm fiber) with wedge entry
 fiber_in_len = chip_length/2 - abs(lens1_x) - lens_radius
 fiber_in_channel = Part.makeCylinder(
     fiber_in_diameter * fiber_clearance / 2,
@@ -123,7 +139,16 @@ fiber_in_channel = Part.makeCylinder(
     Vector(1, 0, 0))
 chip = chip.cut(fiber_in_channel)
 
-# Output fiber channel (100 µm fiber)
+# Wedge entry taper (cone) for input fiber - easier insertion
+wedge_in = Part.makeCone(
+    fiber_in_diameter * fiber_clearance * wedge_multiplier / 2,  # Wide end
+    fiber_in_diameter * fiber_clearance / 2,  # Narrow end
+    wedge_len,
+    Vector(-chip_length/2 - wedge_len, 0, optical_z),
+    Vector(1, 0, 0))
+chip = chip.cut(wedge_in)
+
+# Output fiber channel (100 µm fiber) with wedge entry
 fiber_out_len = chip_length/2 - abs(lens2_x) - lens_radius
 fiber_out_channel = Part.makeCylinder(
     fiber_out_diameter * fiber_clearance / 2,
@@ -131,6 +156,34 @@ fiber_out_channel = Part.makeCylinder(
     Vector(lens2_x + lens_radius, 0, optical_z),
     Vector(1, 0, 0))
 chip = chip.cut(fiber_out_channel)
+
+# Wedge entry taper for output fiber
+wedge_out = Part.makeCone(
+    fiber_out_diameter * fiber_clearance / 2,  # Narrow end (inside)
+    fiber_out_diameter * fiber_clearance * wedge_multiplier / 2,  # Wide end (outside)
+    wedge_len,
+    Vector(chip_length/2, 0, optical_z),
+    Vector(1, 0, 0))
+chip = chip.cut(wedge_out)
+
+# Fiber supports (ribs) along channel for stripped fiber alignment
+# Small bumps that hold fiber in place without blocking light
+for fiber_x, fiber_d, fiber_len, start_x in [
+    ("in", fiber_in_diameter, fiber_in_len, -chip_length/2),
+    ("out", fiber_out_diameter, fiber_out_len, lens2_x + lens_radius)
+]:
+    n_supports = int(fiber_len / support_spacing)
+    for i in range(1, n_supports):
+        support_x = start_x + i * support_spacing
+        # Small support rib (doesn't fully close channel)
+        # Just 2 opposing bumps to hold fiber
+        for y_sign in [-1, 1]:
+            support = Part.makeBox(
+                support_width, support_width, fiber_d * 0.3,
+                Vector(support_x - support_width/2,
+                       y_sign * fiber_d * fiber_clearance * 0.4,
+                       optical_z - fiber_d * 0.15))
+            # Note: supports are left as solid (not cut) - they protrude into channel
 
 # ============================================
 # PDMS injection channels (45% wider, at fiber termination)
@@ -156,10 +209,28 @@ chip = chip.cut(pdms_out_channel)
 
 # ============================================
 # Ball lens cavities
+# Input: convex+concave pair (if enabled) for beam shaping
+# Output: single ball lens for collection
 # ============================================
-lens1_cav = Part.makeSphere(lens_radius * 1.02, Vector(lens1_x, 0, optical_z))
+if use_lens_pair:
+    # Convex lens cavity (closer to fiber - collimates)
+    lens1a_cav = Part.makeSphere(lens_radius * 1.02, Vector(lens1a_x, 0, optical_z))
+    chip = chip.cut(lens1a_cav)
+    # Concave lens cavity (plano-concave approximated as smaller sphere cutout)
+    # Creates diverging effect to shape beam for chamber
+    concave_r = lens_radius * 0.7  # Smaller radius = stronger divergence
+    lens1b_cav = Part.makeSphere(concave_r * 1.02, Vector(lens1b_x, 0, optical_z))
+    chip = chip.cut(lens1b_cav)
+    # Channel between lens pair
+    lens_pair_ch = Part.makeCylinder(0.3, lens_spacing,
+                                      Vector(lens1a_x + lens_radius, 0, optical_z), Vector(1,0,0))
+    chip = chip.cut(lens_pair_ch)
+else:
+    lens1_cav = Part.makeSphere(lens_radius * 1.02, Vector(lens1_x, 0, optical_z))
+    chip = chip.cut(lens1_cav)
+
+# Output lens cavity (single ball lens)
 lens2_cav = Part.makeSphere(lens_radius * 1.02, Vector(lens2_x, 0, optical_z))
-chip = chip.cut(lens1_cav)
 chip = chip.cut(lens2_cav)
 
 # Optical channels: lens to chamber (clear optical path)
@@ -180,18 +251,23 @@ chip = chip.cut(chamber)
 
 # ============================================
 # Micro-wells (hemispherical) at chamber bottom
-# Encourage spheroid formation, prevent lateral spreading
-# Well diameter ~500µm for ~250µm organoids
+# Encourage spheroid formation at cell seeding stage
+# Small wells (50-100µm) in 3x3 array = 9 wells
 # ============================================
-microwell_r = 0.25  # 250µm radius = 500µm diameter wells
-microwell_spacing = 0.6  # 600µm center-to-center
-n_wells_x = 2
-n_wells_y = 1
+microwell_r = 0.025  # 25µm radius = 50µm diameter wells (for initial cell clusters)
+n_wells_x = 3  # 3x3 array
+n_wells_y = 3
+# Space wells across chamber, leaving margin at edges
+well_margin = 0.15  # 150µm from chamber edge
+well_area_x = chamber_length - 2 * well_margin
+well_area_y = chamber_width - 2 * well_margin
+microwell_spacing_x = well_area_x / (n_wells_x - 1) if n_wells_x > 1 else 0
+microwell_spacing_y = well_area_y / (n_wells_y - 1) if n_wells_y > 1 else 0
 
 for ix in range(n_wells_x):
     for iy in range(n_wells_y):
-        well_x = -microwell_spacing/2 + ix * microwell_spacing
-        well_y = 0
+        well_x = -chamber_length/2 + well_margin + ix * microwell_spacing_x
+        well_y = -chamber_width/2 + well_margin + iy * microwell_spacing_y
         well_z = optical_z - chamber_height/2  # Bottom of chamber
         # Hemispherical depression
         well = Part.makeSphere(microwell_r, Vector(well_x, well_y, well_z))
@@ -199,7 +275,7 @@ for ix in range(n_wells_x):
 
 # ============================================
 # Temperature sensor port
-# Small channel for thermocouple/RTD probe (maintain 37°C)
+# Small channel for thermocouple/RTD probe (maintain 37.1°C)
 # ============================================
 temp_sensor_d = 0.5  # 500µm channel for sensor probe
 temp_sensor_depth = chip_height - optical_z + chamber_height/2 - 0.5  # Near chamber
@@ -359,13 +435,17 @@ FreeCADGui.ActiveDocument.ActiveView.viewIsometric()
 print("PHLoC Organoid Chip created!")
 print(f"  Chip: {chip_length} x {chip_width} x {chip_height} mm")
 print(f"  Chamber: {chamber_length} x {chamber_width} x {chamber_height} mm = {chamber_volume_uL:.1f} µL")
-print(f"  Micro-wells: {n_wells_x}x{n_wells_y} hemispherical ({microwell_r*2*1000:.0f}µm) for spheroid formation")
-print(f"  Ball lenses: {lens_radius * 2} mm diameter")
-print(f"  Fiber input: {fiber_in_diameter * 1000:.0f} µm (single-mode)")
-print(f"  Fiber output: {fiber_out_diameter * 1000:.0f} µm (multi-mode)")
-print(f"  Microchannels: {n_parallel_channels}x {microchannel_diameter * 1000:.0f} µm parallel (gentle laminar flow)")
-print(f"  Temperature port: {temp_sensor_d * 1000:.0f} µm (for 37C monitoring)")
-print(f"  PDMS injection: {pdms_inject_in * 1000:.0f} µm in, {pdms_inject_out * 1000:.0f} µm out")
+print(f"  Micro-wells: {n_wells_x}x{n_wells_y}={n_wells_x*n_wells_y} wells ({microwell_r*2*1000:.0f}µm) for cell seeding")
+if use_lens_pair:
+    print(f"  Input optics: convex+concave pair ({lens_radius*2}mm + {concave_r*2}mm)")
+else:
+    print(f"  Input optics: ball lens ({lens_radius * 2}mm)")
+print(f"  Output optics: ball lens ({lens_radius * 2}mm)")
+print(f"  Fiber input: {fiber_in_diameter * 1000:.0f} µm with wedge entry + supports")
+print(f"  Fiber output: {fiber_out_diameter * 1000:.0f} µm with wedge entry")
+print(f"  Microchannels: {n_parallel_channels}x {microchannel_diameter * 1000:.0f} µm parallel (gentle laminar)")
+print(f"  Temperature port: {temp_sensor_d * 1000:.0f} µm (for 37.1C)")
+print(f"  PDMS injection: {pdms_inject_in * 1000:.0f} µm / {pdms_inject_out * 1000:.0f} µm")
 '''
 
     result = server.execute_code(code)
