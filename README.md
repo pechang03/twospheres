@@ -99,6 +99,26 @@ result = disc_dimension_via_obstructions(brain_graph, use_pac=True)
 | Optics + Topology | Vortex structures | Resonator cavity design |
 | Neuro + Optics | Wavefront analysis | Neural signal decomposition |
 | Graph + Quantum | Spectral methods | Connectivity eigenvalues |
+| **Fluidics + Neuro** | **CFD (CfdOF/OpenFOAM)** | **PHLoC organoids ↔ Glymphatic CSF flow** |
+
+### Overlap 2: Microfluidics ↔ Glymphatics
+
+The same CFD tools simulate both:
+- **PHLoC**: 10µm channels for organoid culture fluid exchange
+- **Glymphatics**: 10-50µm perivascular spaces for brain CSF/ISF flow
+
+Both operate in Stokes flow regime (Re << 1), enabling shared simulation infrastructure.
+
+```python
+# Same CFD setup works for both applications
+from examples.freecad_cfd_microfluidics import create_microfluidic_geometry
+
+# PHLoC organoid chip
+create_microfluidic_geometry(server, geometry_type="phloc")
+
+# Brain glymphatic perivascular space
+create_microfluidic_geometry(server, geometry_type="glymphatic")
+```
 
 ## Quick Start
 
