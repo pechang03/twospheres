@@ -40,6 +40,8 @@ A cross-domain physics research platform integrating **fMRI neuroscience**, **op
 - `loc_simulator.py` - Lab-on-chip photonic circuits
 - `sensing_service.py` - Interferometric biosensing
 
+**CAD Integration**: FreeCAD MCP + pyoptools addon for PHLoC fabrication design
+
 ### 3. Topology & Geometric Structures
 
 **Vortex Ring / Knot Theory** - Neural pathway modeling via topology:
@@ -178,6 +180,26 @@ The two-sphere model provides a geometric framework unifying:
 - Robertson-Seymour Graph Minor Theorem
 - Kuratowski's planarity criterion
 
+## Related Projects
+
+### FreeCAD MCP (`../freecad-mcp`)
+
+CAD integration for PHLoC (Photonic Lab-on-Chip) design:
+- Control FreeCAD from Claude Desktop via MCP
+- Design optical components, resonator cavities, microfluidic channels
+- **pyoptools FreeCAD addon** - Direct optical simulation in CAD environment
+- Export to fabrication-ready formats
+
+```bash
+# FreeCAD MCP tools
+create_object    # Primitives, extrusions, boolean ops
+execute_code     # Arbitrary FreeCAD Python
+get_view         # Screenshot feedback
+insert_part_from_library  # Standard optical components
+```
+
+**Workflow**: Design in FreeCAD MCP → Simulate in twosphere-mcp → Iterate
+
 ## Dependencies
 
 - **pyoptools** >= 0.3.7 - Optical simulation
@@ -185,6 +207,7 @@ The two-sphere model provides a geometric framework unifying:
 - **numpy/scipy** - Numerical computing
 - **matplotlib** - Visualization
 - **mcp** - Model Context Protocol
+- **FreeCAD** (optional) - CAD via freecad-mcp
 
 ## Task Tracking
 
