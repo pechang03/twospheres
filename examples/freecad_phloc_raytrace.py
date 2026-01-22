@@ -2,24 +2,35 @@
 """
 PHLoC (Photonic Lab-on-Chip) Design and Ray Tracing via FreeCAD MCP.
 
+Designed for HNSCC (Head and Neck Squamous Cell Carcinoma) organoid culture
+with optical absorption monitoring for drug screening and personalized medicine.
+
 This script demonstrates the full workflow:
 1. Connect to FreeCAD via XML-RPC (requires FreeCAD MCP addon running)
-2. Create PHLoC chip geometry (PDMS microfluidics)
-3. Ray trace through ball lenses using pyoptools
+2. Create PHLoC chip geometry (PDMS microfluidics + optics)
+3. Ray trace through convex+concave lens pair using pyoptools
 4. Visualize rays in FreeCAD
+
+Key features:
+- 1.5 µL chamber with 9x micro-wells (50µm) for spheroid formation
+- 3x 100µm parallel microfluidic channels (gentle laminar flow)
+- Convex+concave lens pair for uniform beam shaping
+- 50µm input / 100µm output fiber with wedge entry
+- 37.1°C temperature monitoring port
+- PDMS 3D printing compatible (100nm resolution)
 
 Prerequisites:
 - FreeCAD with MCP addon installed and RPC server running (port 9875)
 - pyoptools installed in FreeCAD's Python environment
-- OpticsWorkbench (optional, for additional tools)
+- CfdOF + OpenFOAM (optional, for CFD simulation)
 
 Usage:
     python examples/freecad_phloc_raytrace.py
 
 Related:
-- ../freecad-mcp/ - FreeCAD MCP server
-- src/backend/optics/ - twosphere-mcp optical simulation
-- docs/papers/PAC_OBSTRUCTION_BIOLOGICAL_TRACTABILITY.md
+- examples/freecad_cfd_microfluidics.py - CFD flow simulation
+- examples/cfd_microfluidics_example.py - Shear stress analysis
+- docs/CFDOF_INSTALL.md - OpenFOAM installation
 """
 
 import xmlrpc.client
@@ -43,12 +54,22 @@ def connect_freecad(host="localhost", port=9875):
 def create_phloc_chip(server):
     """Create PHLoC chip geometry in FreeCAD.
 
-    Optimized for organoid culture:
-    - Chamber: 1.5 x 1 x 1 mm = 1.5 µL (1.5mm optical path for absorption)
-    - Microfluidic channels: 10µm for gentle fluid exchange (TOP entry, routes to chamber above/below)
-    - PDMS injection channels: 45% wider than fiber, at fiber termination points
-    - Fiber input: 50µm (single-mode)
-    - Fiber output: 100µm (multi-mode collection)
+    Designed for HNSCC (Head and Neck Squamous Cell Carcinoma) organoid culture:
+    - Optical absorption monitoring for cell density/viability/drug response
+    - Chamber: 1.5 x 1 x 1 mm = 1.5 µL (1.5mm optical path for Beer-Lambert)
+    - Chamber ~2x max organoid size for viability
+    - Micro-wells (50µm): guide spheroid formation at seeding
+    - Microfluidic: 3x 100µm parallel channels for gentle laminar flow
+    - Convex+concave lens pair: beam shaping for uniform illumination
+    - Temperature: 37.1°C monitoring port
+    - PDMS 3D printing at 100nm resolution
+
+    Applications:
+    - Cancer drug screening
+    - Personalized medicine (patient-derived tumor organoids)
+    - Tumor microenvironment studies
+
+    Note: Brain organoids use MEA (electrodes) instead of optical - different setup.
     """
 
     code = '''
