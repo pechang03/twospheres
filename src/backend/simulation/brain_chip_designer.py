@@ -128,6 +128,157 @@ class ChipDesign:
             "target_application": self.target_application,
         }
 
+    def to_3duf_json(self, name: str = "Microfluidic Chip") -> Dict[str, Any]:
+        """Export chip design to 3DuF JSON format.
+
+        3DuF uses micrometers (µm) as units and a 2D coordinate system.
+        Features are organized into layers (flow, control).
+
+        Returns:
+            Dict compatible with 3DuF JSON format
+        """
+        import uuid
+
+        def make_id() -> str:
+            return str(uuid.uuid4())
+
+        # Convert mm to µm
+        MM_TO_UM = 1000
+
+        # Device dimensions in µm
+        device_width = int(self.length * MM_TO_UM)
+        device_height = int(self.width * MM_TO_UM)
+        channel_height = 100  # Standard PDMS channel height in µm
+
+        features = {}
+
+        # Add chambers
+        for chamber in self.chambers:
+            fid = make_id()
+            # Convert center position from mm to µm
+            # 3DuF uses top-left origin, we use center
+            x = int((chamber.center[0] + self.length / 2) * MM_TO_UM)
+            y = int((chamber.center[1] + self.width / 2) * MM_TO_UM)
+
+            features[fid] = {
+                "id": fid,
+                "name": chamber.name,
+                "type": "Chamber",
+                "params": {
+                    "position": [x, y],
+                    "width": int(chamber.width * MM_TO_UM),
+                    "length": int(chamber.depth * MM_TO_UM),
+                    "height": channel_height,
+                    "cornerRadius": 50,
+                    "rotation": 0
+                }
+            }
+
+        # Add channels
+        for channel in self.channels:
+            fid = make_id()
+            # Convert coordinates
+            x1 = int((channel.start[0] + self.length / 2) * MM_TO_UM)
+            y1 = int((channel.start[1] + self.width / 2) * MM_TO_UM)
+            x2 = int((channel.end[0] + self.length / 2) * MM_TO_UM)
+            y2 = int((channel.end[1] + self.width / 2) * MM_TO_UM)
+
+            features[fid] = {
+                "id": fid,
+                "name": channel.name or "Channel",
+                "type": "Channel",
+                "params": {
+                    "start": [x1, y1],
+                    "end": [x2, y2],
+                    "width": int(channel.diameter_um),
+                    "height": channel_height
+                }
+            }
+
+        # Add inlet channels
+        for channel in self.inlet_channels:
+            fid = make_id()
+            x1 = int((channel.start[0] + self.length / 2) * MM_TO_UM)
+            y1 = int((channel.start[1] + self.width / 2) * MM_TO_UM)
+            x2 = int((channel.end[0] + self.length / 2) * MM_TO_UM)
+            y2 = int((channel.end[1] + self.width / 2) * MM_TO_UM)
+
+            features[fid] = {
+                "id": fid,
+                "name": channel.name or "Inlet Channel",
+                "type": "Channel",
+                "params": {
+                    "start": [x1, y1],
+                    "end": [x2, y2],
+                    "width": int(channel.diameter_um),
+                    "height": channel_height
+                }
+            }
+
+        # Add inlet ports
+        for port in self.inlet_ports:
+            fid = make_id()
+            x = int((port.position[0] + self.length / 2) * MM_TO_UM)
+            y = int((port.position[1] + self.width / 2) * MM_TO_UM)
+
+            features[fid] = {
+                "id": fid,
+                "name": f"Port_{port.chamber_name}",
+                "type": "Port",
+                "params": {
+                    "position": [x, y],
+                    "radius1": int(port.port_diameter_um / 2),
+                    "radius2": int(port.port_diameter_um / 2),
+                    "height": channel_height
+                }
+            }
+
+        # Add main inlet/outlet ports
+        for port_name, position in [("Main_Inlet", self.main_inlet_position),
+                                     ("Main_Outlet", self.main_outlet_position)]:
+            fid = make_id()
+            x = int((position[0] + self.length / 2) * MM_TO_UM)
+            y = int((position[1] + self.width / 2) * MM_TO_UM)
+
+            features[fid] = {
+                "id": fid,
+                "name": port_name,
+                "type": "Port",
+                "params": {
+                    "position": [x, y],
+                    "radius1": 500,  # 1mm diameter main port
+                    "radius2": 500,
+                    "height": channel_height
+                }
+            }
+
+        # Build 3DuF JSON structure
+        return {
+            "name": name,
+            "params": {
+                "width": device_width,
+                "height": device_height
+            },
+            "layers": [
+                {
+                    "name": "flow",
+                    "color": "indigo",
+                    "params": {
+                        "z_offset": 0,
+                        "flip": False
+                    },
+                    "features": features
+                }
+            ],
+            "groups": [],
+            "defaults": {},
+            "metadata": {
+                "disc_dimension": self.disc_dimension,
+                "network_type": self.network_type,
+                "source": "brain_chip_designer.py"
+            }
+        }
+
 
 class BrainChipDesigner:
     """Designer for brain-mimetic microfluidic chips.
@@ -2329,6 +2480,309 @@ class BrainChipDesigner:
             excess = (n_edges - max_planar_edges) / max(n_edges, 1)
             return 2.5 + 1.5 * excess  # 2.5 to 4.0
 
+    # =========================================================================
+    # STANDARD LOC DESIGNS
+    # Well-established microfluidic geometries used across the field
+    # =========================================================================
+
+    def design_y_junction_mixer(
+        self,
+        angle_deg: float = 45.0,
+        channel_width_um: float = 100.0,
+        mixing_length_mm: float = 10.0,
+    ) -> "ChipDesign":
+        """Y-junction mixer - basic passive mixing."""
+        chip = ChipDesign(
+            length=mixing_length_mm + 5.0,
+            width=10.0,
+            height=3.0,
+            network_type="y_junction_mixer",
+        )
+        junction = (0.0, 0.0, 1.5)
+        angle_rad = np.radians(angle_deg)
+        inlet_length = 5.0
+        inlet1 = (-inlet_length * np.cos(angle_rad), inlet_length * np.sin(angle_rad), 1.5)
+        inlet2 = (-inlet_length * np.cos(angle_rad), -inlet_length * np.sin(angle_rad), 1.5)
+        outlet = (mixing_length_mm, 0.0, 1.5)
+        chip.channels.append(ChannelSpec(start=inlet1, end=junction, diameter_um=channel_width_um, name="inlet_A"))
+        chip.channels.append(ChannelSpec(start=inlet2, end=junction, diameter_um=channel_width_um, name="inlet_B"))
+        chip.channels.append(ChannelSpec(start=junction, end=outlet, diameter_um=channel_width_um, name="mixing_channel"))
+        chip.chambers.append(ChamberSpec(center=inlet1, width=1.0, name="inlet_A"))
+        chip.chambers.append(ChamberSpec(center=inlet2, width=1.0, name="inlet_B"))
+        chip.chambers.append(ChamberSpec(center=outlet, width=1.0, name="outlet"))
+        chip.disc_dimension = 1.0
+        return chip
+
+    def design_t_junction(self, channel_width_um: float = 100.0, mode: str = "mixing") -> "ChipDesign":
+        """T-junction - mixing or droplet generation."""
+        chip = ChipDesign(length=20.0, width=10.0, height=3.0, network_type=f"t_junction_{mode}")
+        junction = (0.0, 0.0, 1.5)
+        inlet_main = (-8.0, 0.0, 1.5)
+        outlet = (8.0, 0.0, 1.5)
+        inlet_side = (0.0, 4.0, 1.5)
+        main_width = channel_width_um
+        side_width = channel_width_um * 0.5 if mode == "droplet" else channel_width_um
+        chip.channels.append(ChannelSpec(start=inlet_main, end=junction, diameter_um=main_width, name="main_inlet"))
+        chip.channels.append(ChannelSpec(start=inlet_side, end=junction, diameter_um=side_width, name="side_inlet"))
+        chip.channels.append(ChannelSpec(start=junction, end=outlet, diameter_um=main_width, name="outlet"))
+        chip.chambers.append(ChamberSpec(center=inlet_main, width=1.0, name="main_inlet"))
+        chip.chambers.append(ChamberSpec(center=inlet_side, width=1.0, name="side_inlet"))
+        chip.chambers.append(ChamberSpec(center=outlet, width=1.0, name="outlet"))
+        chip.disc_dimension = 1.0
+        return chip
+
+    def design_serpentine_mixer(self, n_turns: int = 10, channel_width_um: float = 100.0,
+                                 turn_radius_mm: float = 0.5, straight_length_mm: float = 2.0) -> "ChipDesign":
+        """Serpentine mixer - extended path length with Dean vortices."""
+        chip = ChipDesign(length=straight_length_mm + 4.0, width=(n_turns + 1) * (turn_radius_mm * 2 + 0.5),
+                          height=3.0, network_type="serpentine_mixer")
+        x, y, z = 0.0, 0.0, 1.5
+        direction = 1
+        points = [(x, y, z)]
+        for i in range(n_turns):
+            x += direction * straight_length_mm
+            points.append((x, y, z))
+            y += turn_radius_mm * 2
+            points.append((x, y, z))
+            direction *= -1
+        x += direction * straight_length_mm
+        points.append((x, y, z))
+        for i in range(len(points) - 1):
+            chip.channels.append(ChannelSpec(start=points[i], end=points[i + 1], diameter_um=channel_width_um, name=f"segment_{i}"))
+        chip.chambers.append(ChamberSpec(center=points[0], width=1.0, name="inlet"))
+        chip.chambers.append(ChamberSpec(center=points[-1], width=1.0, name="outlet"))
+        chip.disc_dimension = 1.0
+        return chip
+
+    def design_herringbone_mixer(self, n_cycles: int = 5, channel_width_um: float = 200.0,
+                                  channel_length_mm: float = 20.0, groove_depth_um: float = 50.0) -> "ChipDesign":
+        """Staggered Herringbone Mixer (SHM) - chaotic advection mixing."""
+        chip = ChipDesign(length=channel_length_mm + 4.0, width=5.0, height=3.0, network_type="herringbone_mixer")
+        inlet = (-channel_length_mm / 2, 0.0, 1.5)
+        outlet = (channel_length_mm / 2, 0.0, 1.5)
+        chip.channels.append(ChannelSpec(start=inlet, end=outlet, diameter_um=channel_width_um, name="main_channel"))
+        chip.chambers.append(ChamberSpec(center=inlet, width=1.0, name="inlet"))
+        chip.chambers.append(ChamberSpec(center=outlet, width=1.0, name="outlet"))
+        chip.network_type = f"herringbone_mixer_cycles{n_cycles}_groove{groove_depth_um}um"
+        chip.disc_dimension = 1.0
+        return chip
+
+    def design_flow_focusing(self, orifice_width_um: float = 50.0, channel_width_um: float = 200.0) -> "ChipDesign":
+        """Flow focusing geometry - droplet generation."""
+        chip = ChipDesign(length=20.0, width=12.0, height=3.0, network_type="flow_focusing")
+        dispersed_inlet = (-8.0, 0.0, 1.5)
+        orifice = (0.0, 0.0, 1.5)
+        sheath_top = (-4.0, 4.0, 1.5)
+        sheath_bottom = (-4.0, -4.0, 1.5)
+        outlet = (8.0, 0.0, 1.5)
+        chip.channels.append(ChannelSpec(start=dispersed_inlet, end=orifice, diameter_um=channel_width_um, name="dispersed_inlet"))
+        chip.channels.append(ChannelSpec(start=sheath_top, end=orifice, diameter_um=channel_width_um, name="sheath_top"))
+        chip.channels.append(ChannelSpec(start=sheath_bottom, end=orifice, diameter_um=channel_width_um, name="sheath_bottom"))
+        chip.channels.append(ChannelSpec(start=orifice, end=outlet, diameter_um=orifice_width_um, name="focusing_orifice"))
+        chip.chambers.append(ChamberSpec(center=dispersed_inlet, width=1.0, name="dispersed"))
+        chip.chambers.append(ChamberSpec(center=sheath_top, width=1.0, name="sheath_top"))
+        chip.chambers.append(ChamberSpec(center=sheath_bottom, width=1.0, name="sheath_bottom"))
+        chip.chambers.append(ChamberSpec(center=outlet, width=2.0, name="collection"))
+        chip.disc_dimension = 1.5
+        return chip
+
+    def design_gradient_generator(self, n_outlets: int = 5, channel_width_um: float = 100.0) -> "ChipDesign":
+        """Christmas tree gradient generator - concentration gradients."""
+        chip = ChipDesign(length=25.0, width=20.0, height=3.0, network_type="gradient_generator")
+        inlet_a = (-10.0, 3.0, 1.5)
+        inlet_b = (-10.0, -3.0, 1.5)
+        chip.chambers.append(ChamberSpec(center=inlet_a, width=1.0, name="inlet_A"))
+        chip.chambers.append(ChamberSpec(center=inlet_b, width=1.0, name="inlet_B"))
+        n_levels = n_outlets - 1
+        prev_nodes = [inlet_a, inlet_b]
+        for level in range(n_levels):
+            x = -8.0 + level * 4.0
+            n_nodes = level + 3
+            y_span = 8.0
+            new_nodes = []
+            for i in range(n_nodes):
+                y = y_span * (i / (n_nodes - 1) - 0.5)
+                node = (x, y, 1.5)
+                new_nodes.append(node)
+                if i < len(prev_nodes):
+                    chip.channels.append(ChannelSpec(start=prev_nodes[i], end=node, diameter_um=channel_width_um, name=f"level{level}_ch{i}a"))
+                if i > 0 and i - 1 < len(prev_nodes):
+                    chip.channels.append(ChannelSpec(start=prev_nodes[i - 1], end=node, diameter_um=channel_width_um, name=f"level{level}_ch{i}b"))
+            prev_nodes = new_nodes
+        for i, node in enumerate(prev_nodes):
+            outlet = (node[0] + 3.0, node[1], node[2])
+            chip.channels.append(ChannelSpec(start=node, end=outlet, diameter_um=channel_width_um, name=f"outlet_{i}"))
+            chip.chambers.append(ChamberSpec(center=outlet, width=1.0, name=f"outlet_{i}_conc{int(100*i/(len(prev_nodes)-1))}pct"))
+        chip.disc_dimension = 1.5
+        return chip
+
+    def design_tesla_valve(self, n_segments: int = 5, channel_width_um: float = 200.0) -> "ChipDesign":
+        """Tesla valve - passive diodic flow (no moving parts)."""
+        chip = ChipDesign(length=n_segments * 4.0 + 4.0, width=6.0, height=3.0, network_type="tesla_valve")
+        x = -n_segments * 2.0
+        y, z = 0.0, 1.5
+        prev_point = (x, y, z)
+        chip.chambers.append(ChamberSpec(center=prev_point, width=1.0, name="inlet"))
+        for i in range(n_segments):
+            junction = (x + 2.0, y, z)
+            chip.channels.append(ChannelSpec(start=prev_point, end=junction, diameter_um=channel_width_um, name=f"main_{i}"))
+            bypass_top = (x + 2.0, y + 1.5, z)
+            bypass_end = (x + 4.0, y, z)
+            chip.channels.append(ChannelSpec(start=junction, end=bypass_top, diameter_um=channel_width_um * 0.7, name=f"bypass_up_{i}"))
+            chip.channels.append(ChannelSpec(start=bypass_top, end=bypass_end, diameter_um=channel_width_um * 0.7, name=f"bypass_down_{i}"))
+            chip.channels.append(ChannelSpec(start=junction, end=bypass_end, diameter_um=channel_width_um, name=f"direct_{i}"))
+            prev_point = bypass_end
+            x += 4.0
+        chip.chambers.append(ChamberSpec(center=prev_point, width=1.0, name="outlet"))
+        chip.disc_dimension = 1.5
+        return chip
+
+    def design_h_filter(self, channel_width_um: float = 100.0, diffusion_length_mm: float = 10.0) -> "ChipDesign":
+        """H-filter - diffusion-based separation."""
+        chip = ChipDesign(length=diffusion_length_mm + 8.0, width=10.0, height=3.0, network_type="h_filter")
+        inlet_sample = (-diffusion_length_mm / 2 - 3.0, 1.0, 1.5)
+        inlet_buffer = (-diffusion_length_mm / 2 - 3.0, -1.0, 1.5)
+        merge = (-diffusion_length_mm / 2, 0.0, 1.5)
+        split = (diffusion_length_mm / 2, 0.0, 1.5)
+        outlet_waste = (diffusion_length_mm / 2 + 3.0, 1.0, 1.5)
+        outlet_extract = (diffusion_length_mm / 2 + 3.0, -1.0, 1.5)
+        chip.channels.append(ChannelSpec(start=inlet_sample, end=merge, diameter_um=channel_width_um, name="sample_inlet"))
+        chip.channels.append(ChannelSpec(start=inlet_buffer, end=merge, diameter_um=channel_width_um, name="buffer_inlet"))
+        chip.channels.append(ChannelSpec(start=merge, end=split, diameter_um=channel_width_um * 2, name="diffusion_zone"))
+        chip.channels.append(ChannelSpec(start=split, end=outlet_waste, diameter_um=channel_width_um, name="waste_outlet"))
+        chip.channels.append(ChannelSpec(start=split, end=outlet_extract, diameter_um=channel_width_um, name="extract_outlet"))
+        chip.chambers.append(ChamberSpec(center=inlet_sample, width=1.0, name="sample_inlet"))
+        chip.chambers.append(ChamberSpec(center=inlet_buffer, width=1.0, name="buffer_inlet"))
+        chip.chambers.append(ChamberSpec(center=outlet_waste, width=1.0, name="waste"))
+        chip.chambers.append(ChamberSpec(center=outlet_extract, width=1.0, name="extract"))
+        chip.disc_dimension = 1.5
+        return chip
+
+    def design_dean_flow_spiral(self, n_turns: float = 3.0, inner_radius_mm: float = 2.0,
+                                 channel_width_um: float = 200.0, pitch_mm: float = 1.0) -> "ChipDesign":
+        """Dean flow spiral - particle separation by size/density."""
+        chip = ChipDesign(length=(inner_radius_mm + n_turns * pitch_mm) * 2 + 4.0,
+                          width=(inner_radius_mm + n_turns * pitch_mm) * 2 + 4.0,
+                          height=3.0, network_type="dean_flow_spiral")
+        n_points = int(n_turns * 36)
+        points = []
+        for i in range(n_points + 1):
+            theta = 2 * np.pi * n_turns * i / n_points
+            r = inner_radius_mm + pitch_mm * theta / (2 * np.pi)
+            x = r * np.cos(theta)
+            y = r * np.sin(theta)
+            points.append((x, y, 1.5))
+        for i in range(len(points) - 1):
+            chip.channels.append(ChannelSpec(start=points[i], end=points[i + 1], diameter_um=channel_width_um, name=f"spiral_{i}"))
+        chip.chambers.append(ChamberSpec(center=points[0], width=1.0, name="inlet"))
+        chip.chambers.append(ChamberSpec(center=points[-1], width=1.0, name="outlet"))
+        chip.disc_dimension = 1.0
+        return chip
+
+    def design_dld_array(self, n_rows: int = 10, n_cols: int = 20, post_diameter_um: float = 20.0,
+                          gap_um: float = 25.0, shift_fraction: float = 0.1) -> "ChipDesign":
+        """Deterministic Lateral Displacement (DLD) array - size-based separation."""
+        pitch = post_diameter_um + gap_um
+        array_width = n_cols * pitch / 1000
+        array_length = n_rows * pitch / 1000
+        chip = ChipDesign(length=array_length + 6.0, width=array_width + 4.0, height=3.0, network_type="dld_array")
+        for row in range(n_rows):
+            shift = (row * shift_fraction * pitch) % pitch
+            for col in range(n_cols):
+                x = -array_length / 2 + row * pitch / 1000
+                y = -array_width / 2 + (col * pitch + shift) / 1000
+                chip.chambers.append(ChamberSpec(center=(x, y, 1.5), width=post_diameter_um / 1000, name=f"post_{row}_{col}"))
+        inlet = (-array_length / 2 - 2.0, 0.0, 1.5)
+        outlet_large = (array_length / 2 + 2.0, array_width / 4, 1.5)
+        outlet_small = (array_length / 2 + 2.0, -array_width / 4, 1.5)
+        chip.chambers.append(ChamberSpec(center=inlet, width=1.0, name="inlet"))
+        chip.chambers.append(ChamberSpec(center=outlet_large, width=1.0, name="outlet_large"))
+        chip.chambers.append(ChamberSpec(center=outlet_small, width=1.0, name="outlet_small"))
+        D_c = 1.4 * gap_um * (shift_fraction ** 0.48)
+        chip.network_type = f"dld_array_Dc{D_c:.1f}um"
+        chip.disc_dimension = 2.0
+        return chip
+
+    def design_split_recombine_mixer(self, n_stages: int = 4, channel_width_um: float = 100.0) -> "ChipDesign":
+        """Split-and-Recombine (SAR) mixer - geometric mixing."""
+        chip = ChipDesign(length=n_stages * 6.0 + 6.0, width=8.0, height=3.0, network_type="split_recombine_mixer")
+        x, z = -n_stages * 3.0, 1.5
+        inlet = (x - 2.0, 0.0, z)
+        chip.chambers.append(ChamberSpec(center=inlet, width=1.0, name="inlet"))
+        prev_point = inlet
+        for stage in range(n_stages):
+            split = (x, 0.0, z)
+            branch_top = (x + 2.0, 1.5, z)
+            branch_bottom = (x + 2.0, -1.5, z)
+            recombine = (x + 4.0, 0.0, z)
+            chip.channels.append(ChannelSpec(start=prev_point, end=split, diameter_um=channel_width_um, name=f"stage{stage}_in"))
+            chip.channels.append(ChannelSpec(start=split, end=branch_top, diameter_um=channel_width_um * 0.7, name=f"stage{stage}_split_top"))
+            chip.channels.append(ChannelSpec(start=split, end=branch_bottom, diameter_um=channel_width_um * 0.7, name=f"stage{stage}_split_bottom"))
+            chip.channels.append(ChannelSpec(start=branch_top, end=recombine, diameter_um=channel_width_um * 0.7, name=f"stage{stage}_merge_top"))
+            chip.channels.append(ChannelSpec(start=branch_bottom, end=recombine, diameter_um=channel_width_um * 0.7, name=f"stage{stage}_merge_bottom"))
+            prev_point = recombine
+            x += 6.0
+        outlet = (x, 0.0, z)
+        chip.channels.append(ChannelSpec(start=prev_point, end=outlet, diameter_um=channel_width_um, name="outlet_channel"))
+        chip.chambers.append(ChamberSpec(center=outlet, width=1.0, name="outlet"))
+        chip.network_type = f"split_recombine_{n_stages}stages_{2**n_stages}lamellae"
+        chip.disc_dimension = 1.5
+        return chip
+
+    def design_standard_loc_set(self) -> Dict[str, "ChipDesign"]:
+        """Generate complete set of standard LOC designs."""
+        return {
+            "y_junction": self.design_y_junction_mixer(),
+            "t_junction_mixing": self.design_t_junction(mode="mixing"),
+            "t_junction_droplet": self.design_t_junction(mode="droplet"),
+            "serpentine": self.design_serpentine_mixer(),
+            "herringbone": self.design_herringbone_mixer(),
+            "flow_focusing": self.design_flow_focusing(),
+            "gradient_generator": self.design_gradient_generator(),
+            "tesla_valve": self.design_tesla_valve(),
+            "h_filter": self.design_h_filter(),
+            "dean_spiral": self.design_dean_flow_spiral(),
+            "dld_array": self.design_dld_array(),
+            "split_recombine": self.design_split_recombine_mixer(),
+        }
+
+    # =========================================================================
+    # 3DuF EXPORT
+    # =========================================================================
+
+    def export_to_3duf_file(self, design: ChipDesign, filepath: str, name: Optional[str] = None) -> Dict[str, Any]:
+        """Export chip design to 3DuF JSON file."""
+        import json
+        if name is None:
+            name = design.network_type or "Microfluidic Chip"
+        data = design.to_3duf_json(name)
+        with open(filepath, 'w') as f:
+            json.dump(data, f, indent=2)
+        return {"success": True, "filepath": filepath, "name": name, "features": len(data["layers"][0]["features"])}
+
+    def export_to_3duf_mcp(self, design: ChipDesign, name: Optional[str] = None,
+                           host: str = "localhost", port: int = 9000) -> Dict[str, Any]:
+        """Export chip design to 3DuF via MCP server."""
+        if name is None:
+            name = design.network_type or "Microfluidic Chip"
+        data = design.to_3duf_json(name)
+        try:
+            server = xmlrpc.client.ServerProxy(f'http://{host}:{port}')
+            result = server.load_design(data)
+            return {"success": True, "name": name, "features": len(data["layers"][0]["features"]), "server_response": result}
+        except Exception as e:
+            return {"success": False, "error": str(e), "data": data}
+
+    def export_comparison_to_3duf(self, designs: Dict[str, ChipDesign], output_dir: str) -> Dict[str, Any]:
+        """Export multiple designs to 3DuF JSON files."""
+        import os
+        os.makedirs(output_dir, exist_ok=True)
+        results = {}
+        for name, design in designs.items():
+            filepath = os.path.join(output_dir, f"{name}.json")
+            results[name] = self.export_to_3duf_file(design, filepath, name)
+        return results
+
 
 class FreeCADExporter:
     """Export chip designs to FreeCAD via XML-RPC."""
@@ -2497,20 +2951,6 @@ print(f"  Network type: {design.network_type}")
 '''
 
         return code
-
-    def export_comparison_set(
-        self,
-        designs: Dict[str, ChipDesign],
-    ) -> Dict[str, Any]:
-        """Export comparison set of chip designs."""
-        results = {}
-
-        for name, design in designs.items():
-            doc_name = f"BrainChip_{name}"
-            result = self.export_design(design, doc_name)
-            results[name] = result
-
-        return results
 
 
 # Convenience function for MCP integration

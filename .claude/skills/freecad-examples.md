@@ -473,6 +473,39 @@ print(f"  Ports: 2x {port_diameter}mm for tubing")
 
 ---
 
+## Verified Working via XML-RPC Server
+
+The following examples have been tested and confirmed working via the FreeCAD MCP server (port 9875):
+
+| Example | Status | Notes |
+|---------|--------|-------|
+| Plano-convex lens | ✅ Verified | 25.4mm diameter, R=50mm |
+| Barbed hose fitting | ✅ Verified | 3 barbs, 1.6mm ID tubing |
+| Chip holder | ✅ Verified | Pocket, window, M3 holes, tubing ports |
+| Latin Square mixer | ✅ Verified | 4×4 with treatment assignment |
+| Hilbert curve | ✅ Verified | Level-2 curve, 2mm chamber |
+| Fastener demo | ✅ Verified | M3 clearance holes in plate |
+
+### XML-RPC Server Notes
+
+When using `server.execute_code()`:
+- Code executes asynchronously - returns immediately with "scheduled"
+- Use `Gui.ActiveDocument.ActiveView.fitAll()` to auto-zoom to result
+- Multiple documents can be open simultaneously
+- The `Part` module is always available for geometry creation
+
+### GUI-Only Features
+
+Some features require manual GUI interaction (not scriptable via XML-RPC):
+- **CfdOF**: Analysis creation requires workbench switch + dialogs
+- **Fasteners workbench**: Screw insertion via toolbar icons
+- **LCInterlocking**: Edge selection for finger joints
+- **Assembly4**: Constraint definition via GUI panels
+
+For these, use the Python console within FreeCAD GUI directly.
+
+---
+
 ## Notes & Tips
 
 ### General FreeCAD Tips

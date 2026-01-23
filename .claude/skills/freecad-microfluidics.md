@@ -216,8 +216,28 @@ Use for: chip holders, pump enclosures, electronics boxes
 4. Mate LCS pairs to constrain assembly
 5. Check clearances for tubing and optical path
 
+## CAD Library
+
+Pre-made microfluidic designs available in `resources/microfluidic-cad-library/`:
+
+### ELEXAN Templates (F3D - Fusion 360)
+- Luer lock and 1/4-28 threaded ports
+- Single channel (CNC and 3D print versions)
+- Flow cells with configurable ports
+- **Herringbone mixer** - reference design
+- **Droplet generators** - dual inlet, multi-inlet
+- **Inertial sorter** - particle separation
+
+### Research Designs
+- **Component library** (Nature 2024): Droplet generator, picoinjector, sorters, anchoring
+- **Blood-brain barrier chip** (Nature Protocols 2021): Mask + STL frame
+- **Drop-seq device** (Cell 2015): Single-cell RNA-seq
+
+See `resources/microfluidic-cad-library/README.md` for full inventory.
+
 ## Related Files
 
 - `src/backend/simulation/brain_chip_designer.py` - Chip design toolkit
 - `docs/freecad-addons.csv` - Installed addon list
 - `docs/beads/2026-01-22-glymphatic-simulation-milestone.md` - Design documentation
+- `resources/microfluidic-cad-library/` - Pre-made CAD designs
