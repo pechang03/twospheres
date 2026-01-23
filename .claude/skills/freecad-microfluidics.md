@@ -18,6 +18,7 @@ Reference: `docs/freecad-addons.csv`
 
 ### Fabrication
 - **LasercutterSVGExport**: Export for laser cutting PDMS mold masters
+- **LCInterlocking**: Finger joints for laser-cut enclosures/holders
 - **FusedFilamentDesign**: Optimize chip holders for FDM printing
 - **3D_Printing_Tools**: Mesh repair and STL export
 
@@ -121,7 +122,24 @@ import FreeCADServer
 FreeCADServer.start(port=9875)
 ```
 
-### 6. Assembly4 Chip Assembly
+### 6. LCInterlocking Chip Enclosure
+
+Create a laser-cut acrylic enclosure with finger joints:
+
+1. Design box panels in Sketcher (top, bottom, sides)
+2. Switch to LCInterlocking workbench
+3. Select edges to add finger joints
+4. Set parameters:
+   - Finger width: 3-5mm (for 3mm acrylic)
+   - Material thickness: 3mm
+   - Tolerance: 0.1mm for press-fit
+5. Generate interlocking features
+6. Export with LasercutterSVGExport
+7. Cut from acrylic, snap together (no glue needed)
+
+Use for: chip holders, pump enclosures, electronics boxes
+
+### 7. Assembly4 Chip Assembly
 
 1. Create parts as separate FreeCAD documents:
    - `chip.FCStd` - Microfluidic chip (Latin square/Fat Petersen)
