@@ -1,0 +1,17 @@
+name,version,status,category,use_case
+3D_Printing_Tools,,Pending restart,Fabrication,3D printing export and mesh repair
+boltsfc,v2022.11.5,Up-to-date,Assembly,Standard parts library (bolts/fasteners)
+CfdOF,v1.33.3,Installed,Simulation,CFD with OpenFOAM - validate Stokes flow calculations
+Curved Shapes,v1.0.14,Pending restart,Geometry,Create curved/lofted geometries
+Curves workbench,v0.6.70,Pending restart,Geometry,Advanced curve tools (NURBS/Bezier)
+Draft_Circle_3_Points,1.0.1 (git),Up-to-date,Geometry,Draft circles from 3 points
+FEMbyGEN,v2.5.2,Pending restart,Simulation,Finite Element Method - stress/thermal analysis
+HilbertCurve,1.2.0 (git),Up-to-date,Geometry,Space-filling curves for microfluidic mixers
+LasercutterSVGExport,0.7.0 (git),Installed,Fabrication,Export SVG for laser cutting PDMS molds
+Lattice2 Workbench,v1.1.0,Pending restart,Geometry,Create arrays/lattices of objects
+Optics,v1.2.2,Installed,Optics,Optical ray tracing for microscopy design
+pyOpTools Workbench,v0.0.3,Installed,Optics,Python optical tools
+InventorLoader,,Installed,Import,Import Autodesk Inventor files (.ipt/.iam)
+STEMFIE,,Installed,Assembly,Open-source construction system for fixtures
+FusedFilamentDesign,,Installed,Fabrication,Optimize designs for FDM 3D printing
+Assembly4,v0.50+,Installed,Assembly,Constraint-based assembly - chip + holder + microscope
