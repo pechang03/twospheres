@@ -113,16 +113,37 @@ Benefits:
 
 ## FreeCAD Server Connection
 
-Start FreeCAD with XML-RPC server:
-```bash
-freecad --server --port 9875
+Start FreeCAD with MCP/XML-RPC server on port 9875.
+
+### Server API (discovered)
+
+```python
+import xmlrpc.client
+server = xmlrpc.client.ServerProxy('http://localhost:9875')
+
+# Test connection
+server.ping()  # Returns True
+
+# Execute Python code in FreeCAD
+result = server.execute_code('''
+import FreeCAD as App
+import Part
+doc = App.newDocument("Test")
+box = Part.makeBox(10, 10, 10)
+obj = doc.addObject("Part::Feature", "Box")
+obj.Shape = box
+doc.recompute()
+"Done"
+''')
+# Returns: {'success': True, 'message': '...'}
 ```
 
-Or in FreeCAD Python console:
-```python
-import FreeCADServer
-FreeCADServer.start(port=9875)
-```
+### Verified Working Examples
+
+Successfully created via server:
+- Plano-convex lens (25.4mm diameter, R=50mm)
+- Barbed hose fitting (3 barbs, 1.6mm ID tubing)
+- Chip holder (pocket, viewing window, M3 mounting holes)
 
 ### 6. Electroosmotic/Magnetic Flow Control
 
