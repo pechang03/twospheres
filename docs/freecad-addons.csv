@@ -16,3 +16,4 @@ STEMFIE,,Installed,Assembly,Open-source construction system for fixtures
 FusedFilamentDesign,,Installed,Fabrication,Optimize designs for FDM 3D printing
 Assembly4,v0.50+,Installed,Assembly,Constraint-based assembly - chip + holder + microscope
 LCInterlocking,,Installed,Fabrication,Finger joints/interlocking for laser-cut enclosures
+ColorPalette,,Installed,UI,FreeCAD themes and color customization
