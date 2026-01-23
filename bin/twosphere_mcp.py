@@ -90,6 +90,56 @@ async def query_domain_experts(
 async def list_tools() -> List[Tool]:
     """List available TwoSphere MCP tools."""
     return [
+        # =============================================================================
+        # Service Meta Tools (merge2docs pattern)
+        # =============================================================================
+        Tool(
+            name="advice",
+            description="Get guidance on using this service. Returns capabilities, use cases, "
+                       "and recommendations for when to route queries here.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "domain": {
+                        "type": "string",
+                        "description": "Optional domain focus (optics, microfluidics, brain, fluigi)",
+                        "enum": ["optics", "microfluidics", "brain", "fluigi", "all"]
+                    },
+                    "verbose": {
+                        "type": "boolean",
+                        "description": "Include detailed tool descriptions",
+                        "default": False
+                    }
+                },
+                "required": []
+            }
+        ),
+        Tool(
+            name="health_check",
+            description="Verify service health and dependency status. Returns operational status "
+                       "of all subsystems (Fluigi, FreeCAD, ernie2_swarm, etc.).",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "check_fluigi": {
+                        "type": "boolean",
+                        "description": "Test Fluigi CLI availability",
+                        "default": True
+                    },
+                    "check_freecad": {
+                        "type": "boolean",
+                        "description": "Test FreeCAD RPC connection",
+                        "default": False
+                    },
+                    "check_ernie2": {
+                        "type": "boolean",
+                        "description": "Test ernie2_swarm availability",
+                        "default": False
+                    }
+                },
+                "required": []
+            }
+        ),
         Tool(
             name="two_sphere_model",
             description="Create and visualize a two-sphere model for paired brain regions. "
@@ -827,6 +877,335 @@ async def list_tools() -> List[Tool]:
                 "required": []
             }
         ),
+        Tool(
+            name="analyze_brain_clearance",
+            description="Analyze brain glymphatic clearance from fMRI connectivity data. "
+                       "Predicts waste clearance efficiency using disc dimension theory "
+                       "(Paul et al. 2023) and compares sleep vs awake clearance. "
+                       "Includes amyloid-β accumulation risk modeling.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "connectivity_matrix": {
+                        "type": "array",
+                        "description": "NxN functional connectivity matrix (list of lists)",
+                        "items": {"type": "array", "items": {"type": "number"}}
+                    },
+                    "region_labels": {
+                        "type": "array",
+                        "description": "List of brain region names",
+                        "items": {"type": "string"}
+                    },
+                    "brain_state": {
+                        "type": "string",
+                        "enum": ["awake", "sleep", "anesthesia"],
+                        "description": "Brain state for clearance estimation (default: awake)",
+                        "default": "awake"
+                    },
+                    "compute_amyloid": {
+                        "type": "boolean",
+                        "description": "Whether to compute amyloid-β accumulation dynamics",
+                        "default": False
+                    },
+                    "compare_sleep_wake": {
+                        "type": "boolean",
+                        "description": "Compare sleep vs wake clearance (Xie et al. 2013)",
+                        "default": False
+                    },
+                    "expert_query": {
+                        "type": "string",
+                        "description": "Optional: Ask domain experts. Example: 'What connectivity thresholds for Alzheimer risk?'"
+                    }
+                },
+                "required": ["connectivity_matrix"]
+            }
+        ),
+        Tool(
+            name="visualize_brain_clearance",
+            description="Visualize glymphatic clearance on two-sphere brain model. "
+                       "Colors nodes by clearance efficiency, edges by connectivity. "
+                       "Can compare sleep vs wake states side-by-side.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "connectivity_matrix": {
+                        "type": "array",
+                        "description": "NxN brain connectivity matrix",
+                        "items": {"type": "array", "items": {"type": "number"}}
+                    },
+                    "region_labels": {
+                        "type": "array",
+                        "description": "List of brain region names",
+                        "items": {"type": "string"}
+                    },
+                    "brain_state": {
+                        "type": "string",
+                        "enum": ["awake", "sleep"],
+                        "description": "Brain state for visualization",
+                        "default": "awake"
+                    },
+                    "compare_sleep_wake": {
+                        "type": "boolean",
+                        "description": "Show side-by-side sleep vs wake comparison",
+                        "default": False
+                    },
+                    "show_risk": {
+                        "type": "boolean",
+                        "description": "Show amyloid risk overlay (red markers)",
+                        "default": False
+                    },
+                    "save_path": {
+                        "type": "string",
+                        "description": "Path to save visualization PNG"
+                    }
+                },
+                "required": ["connectivity_matrix"]
+            }
+        ),
+        Tool(
+            name="design_brain_chip",
+            description="Design brain-mimetic microfluidic chip for glymphatic validation. "
+                       "Creates channel networks matching brain topology (disc dimension). "
+                       "Can export to FreeCAD for fabrication.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "connectivity_matrix": {
+                        "type": "array",
+                        "description": "Optional NxN brain connectivity matrix",
+                        "items": {"type": "array", "items": {"type": "number"}}
+                    },
+                    "n_regions": {
+                        "type": "integer",
+                        "description": "Number of brain regions (if no matrix)",
+                        "default": 5
+                    },
+                    "network_type": {
+                        "type": "string",
+                        "enum": ["planar", "non_planar", "tree"],
+                        "description": "Network topology type for disc dimension comparison",
+                        "default": "planar"
+                    },
+                    "channel_diameter_um": {
+                        "type": "number",
+                        "description": "Channel diameter in micrometers",
+                        "default": 50
+                    },
+                    "export_to_freecad": {
+                        "type": "boolean",
+                        "description": "Export design to FreeCAD (requires FreeCAD RPC)",
+                        "default": False
+                    },
+                    "comparison_set": {
+                        "type": "boolean",
+                        "description": "Generate planar/non-planar/tree comparison set",
+                        "default": False
+                    }
+                },
+                "required": []
+            }
+        ),
+        Tool(
+            name="simulate_perivascular_flow_3d",
+            description="3D CFD simulation of perivascular CSF flow. "
+                       "Simulates flow in straight, curved, branching, or tortuous vessels. "
+                       "Computes velocity fields, wall shear stress, and clearance rates.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "vessel_radius_um": {
+                        "type": "number",
+                        "description": "Inner vessel radius in micrometers (default: 25)",
+                        "default": 25
+                    },
+                    "gap_thickness_um": {
+                        "type": "number",
+                        "description": "Perivascular space width in micrometers (default: 15)",
+                        "default": 15
+                    },
+                    "length_um": {
+                        "type": "number",
+                        "description": "Vessel segment length in micrometers (default: 1000)",
+                        "default": 1000
+                    },
+                    "pressure_gradient_Pa_m": {
+                        "type": "number",
+                        "description": "Pressure gradient in Pa/m (default: 100)",
+                        "default": 100
+                    },
+                    "geometry_type": {
+                        "type": "string",
+                        "enum": ["straight", "curved", "branching", "tortuous"],
+                        "description": "Vessel geometry type (default: straight)",
+                        "default": "straight"
+                    },
+                    "resolution": {
+                        "type": "integer",
+                        "description": "Grid resolution per dimension (default: 20, higher = more accurate but slower)",
+                        "default": 20
+                    },
+                    "brain_state": {
+                        "type": "string",
+                        "enum": ["awake", "sleep"],
+                        "description": "Brain state for clearance estimation (default: awake)",
+                        "default": "awake"
+                    },
+                    "compare_geometries": {
+                        "type": "boolean",
+                        "description": "Compare flow across straight/curved/tortuous geometries",
+                        "default": False
+                    }
+                },
+                "required": []
+            }
+        ),
+        # =============================================================================
+        # Fluigi/NetworkX Integration Tools (F₂ → F₃ pipeline)
+        # =============================================================================
+        Tool(
+            name="design_to_networkx",
+            description="Convert a ChipDesign to NetworkX graph for graph-based analysis "
+                       "and Fluigi integration. Returns graph metrics and edge list.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "design_json": {
+                        "type": "object",
+                        "description": "ChipDesign as JSON (from design_brain_chip or other design tools)"
+                    },
+                    "include_metrics": {
+                        "type": "boolean",
+                        "description": "Include graph metrics (density, clustering, etc.)",
+                        "default": True
+                    }
+                },
+                "required": ["design_json"]
+            }
+        ),
+        Tool(
+            name="design_to_mint",
+            description="Convert a ChipDesign or NetworkX graph to MINT format for Fluigi. "
+                       "MINT is the Microfluidic Netlist format used by Fluigi place-and-route.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "design_json": {
+                        "type": "object",
+                        "description": "ChipDesign as JSON (from design_brain_chip)"
+                    },
+                    "graph_data": {
+                        "type": "object",
+                        "description": "Alternative: NetworkX graph as node_link_data dict"
+                    },
+                    "device_name": {
+                        "type": "string",
+                        "description": "Name for the MINT device (default: 'chip')",
+                        "default": "chip"
+                    },
+                    "default_channel_width": {
+                        "type": "number",
+                        "description": "Default channel width in micrometers",
+                        "default": 100
+                    }
+                },
+                "required": []
+            }
+        ),
+        Tool(
+            name="fluigi_compile",
+            description="Compile MINT code using Fluigi. Validates syntax and generates intermediate representation. "
+                       "Part of F₂→F₃ design-to-code pipeline.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "mint_code": {
+                        "type": "string",
+                        "description": "MINT code to compile"
+                    },
+                    "mint_file": {
+                        "type": "string",
+                        "description": "Alternative: Path to .mint file"
+                    },
+                    "output_dir": {
+                        "type": "string",
+                        "description": "Output directory for compiled files",
+                        "default": "/tmp/fluigi_output"
+                    }
+                },
+                "required": []
+            }
+        ),
+        Tool(
+            name="fluigi_parchmint",
+            description="Convert MINT to Parchmint JSON format using Fluigi. "
+                       "Parchmint is the intermediate format for microfluidic device description.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "mint_code": {
+                        "type": "string",
+                        "description": "MINT code to convert"
+                    },
+                    "mint_file": {
+                        "type": "string",
+                        "description": "Alternative: Path to .mint file"
+                    },
+                    "output_dir": {
+                        "type": "string",
+                        "description": "Output directory for Parchmint JSON",
+                        "default": "/tmp/fluigi_output"
+                    }
+                },
+                "required": []
+            }
+        ),
+        Tool(
+            name="networkx_to_mint",
+            description="Direct conversion from NetworkX graph to MINT format. "
+                       "Supports various graph types (DiGraph, Graph) with automatic component type inference.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "nodes": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "id": {"type": "string"},
+                                "mint_type": {"type": "string", "enum": ["PORT", "NODE", "MIXER", "CHAMBER"]},
+                                "port_radius": {"type": "number"},
+                                "width": {"type": "number"},
+                                "height": {"type": "number"}
+                            }
+                        },
+                        "description": "List of nodes with attributes"
+                    },
+                    "edges": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "source": {"type": "string"},
+                                "target": {"type": "string"},
+                                "width": {"type": "number"}
+                            }
+                        },
+                        "description": "List of edges with attributes"
+                    },
+                    "device_name": {
+                        "type": "string",
+                        "description": "Name for the MINT device",
+                        "default": "device"
+                    },
+                    "default_channel_width": {
+                        "type": "number",
+                        "description": "Default channel width in micrometers",
+                        "default": 100
+                    }
+                },
+                "required": ["nodes", "edges"]
+            }
+        ),
     ]
 
 
@@ -838,7 +1217,12 @@ async def list_tools() -> List[Tool]:
 async def call_tool(name: str, arguments: Dict[str, Any]) -> List[TextContent]:
     """Handle tool calls."""
     try:
-        if name == "two_sphere_model":
+        # Service meta tools
+        if name == "advice":
+            result = await handle_advice(arguments)
+        elif name == "health_check":
+            result = await handle_health_check(arguments)
+        elif name == "two_sphere_model":
             result = await handle_two_sphere_model(arguments)
         elif name == "vortex_ring":
             result = await handle_vortex_ring(arguments)
@@ -876,6 +1260,25 @@ async def call_tool(name: str, arguments: Dict[str, Any]) -> List[TextContent]:
             result = await handle_analyze_clearance_network(arguments)
         elif name == "design_brain_chip_channel":
             result = await handle_design_brain_chip_channel(arguments)
+        elif name == "analyze_brain_clearance":
+            result = await handle_analyze_brain_clearance(arguments)
+        elif name == "simulate_perivascular_flow_3d":
+            result = await handle_simulate_perivascular_flow_3d(arguments)
+        elif name == "design_brain_chip":
+            result = await handle_design_brain_chip(arguments)
+        elif name == "visualize_brain_clearance":
+            result = await handle_visualize_brain_clearance(arguments)
+        # Fluigi/NetworkX integration tools
+        elif name == "design_to_networkx":
+            result = await handle_design_to_networkx(arguments)
+        elif name == "design_to_mint":
+            result = await handle_design_to_mint(arguments)
+        elif name == "fluigi_compile":
+            result = await handle_fluigi_compile(arguments)
+        elif name == "fluigi_parchmint":
+            result = await handle_fluigi_parchmint(arguments)
+        elif name == "networkx_to_mint":
+            result = await handle_networkx_to_mint(arguments)
         else:
             result = {"error": f"Unknown tool: {name}"}
 
@@ -883,6 +1286,507 @@ async def call_tool(name: str, arguments: Dict[str, Any]) -> List[TextContent]:
 
     except Exception as e:
         return [TextContent(type="text", text=json.dumps({"error": str(e)}))]
+
+
+# =============================================================================
+# Service Meta Handlers (merge2docs pattern)
+# =============================================================================
+
+# RLServiceAdvisor compatible service catalog
+SERVICE_CATALOG = {
+    # Optics cluster
+    "ray_trace": {
+        "description": "Ray tracing through optical surfaces for LOC imaging systems",
+        "capabilities": ["ray_tracing", "optical_design", "surface_analysis"],
+        "avg_time": 2.0,
+        "reliability": 0.95
+    },
+    "wavefront_analysis": {
+        "description": "Zernike polynomial wavefront analysis for aberration characterization",
+        "capabilities": ["wavefront", "zernike", "aberration_analysis"],
+        "avg_time": 1.5,
+        "reliability": 0.95
+    },
+    "interferometric_sensing": {
+        "description": "Phase-shift interferometry for precision measurements",
+        "capabilities": ["interferometry", "phase_analysis", "precision_sensing"],
+        "avg_time": 3.0,
+        "reliability": 0.90
+    },
+    "absorption_spectroscopy": {
+        "description": "Beer-Lambert absorption analysis for concentration measurement",
+        "capabilities": ["spectroscopy", "concentration", "absorption"],
+        "avg_time": 2.0,
+        "reliability": 0.95
+    },
+    # Microfluidics cluster
+    "cfd_microfluidics": {
+        "description": "CFD simulation for microfluidic systems using Stokes flow",
+        "capabilities": ["cfd", "flow_simulation", "microfluidics", "stokes_flow"],
+        "avg_time": 15.0,
+        "reliability": 0.85
+    },
+    "design_brain_chip": {
+        "description": "Design brain-mimetic microfluidic chip from connectivity matrix",
+        "capabilities": ["chip_design", "brain_mimetic", "microfluidics"],
+        "avg_time": 5.0,
+        "reliability": 0.90
+    },
+    "multi_organ_ooc_simulation": {
+        "description": "Multi-organ organ-on-chip pharmacokinetics simulation",
+        "capabilities": ["ooc", "pharmacokinetics", "multi_organ", "simulation"],
+        "avg_time": 10.0,
+        "reliability": 0.85
+    },
+    # Brain analysis cluster
+    "two_sphere_model": {
+        "description": "Two-sphere geometry for paired brain hemisphere analysis",
+        "capabilities": ["geometry", "brain_modeling", "visualization"],
+        "avg_time": 1.0,
+        "reliability": 0.98
+    },
+    "analyze_brain_clearance": {
+        "description": "Glymphatic clearance analysis from fMRI connectivity",
+        "capabilities": ["glymphatic", "clearance", "fmri", "brain_analysis"],
+        "avg_time": 8.0,
+        "reliability": 0.85
+    },
+    "whole_brain_network_analysis": {
+        "description": "Complete brain network analysis with graph metrics",
+        "capabilities": ["network_analysis", "graph_metrics", "brain_connectivity"],
+        "avg_time": 12.0,
+        "reliability": 0.85
+    },
+    # Fluigi cluster (F2->F3 pipeline)
+    "design_to_networkx": {
+        "description": "Convert ChipDesign to NetworkX graph for analysis",
+        "capabilities": ["graph_conversion", "networkx", "design_analysis"],
+        "avg_time": 0.5,
+        "reliability": 0.98
+    },
+    "design_to_mint": {
+        "description": "Convert ChipDesign to MINT format for Fluigi",
+        "capabilities": ["mint_generation", "design_conversion", "fluigi"],
+        "avg_time": 0.5,
+        "reliability": 0.95
+    },
+    "fluigi_parchmint": {
+        "description": "Convert MINT to Parchmint JSON via Fluigi place-and-route",
+        "capabilities": ["parchmint", "place_and_route", "fluigi", "fabrication"],
+        "avg_time": 5.0,
+        "reliability": 0.90
+    },
+}
+
+# Q-table bootstrap templates for RLServiceAdvisor
+CONTEXT_TEMPLATES = {
+    "optical_design": {
+        "ray_trace": 0.9, "wavefront_analysis": 0.8, "interferometric_sensing": 0.7,
+        "absorption_spectroscopy": 0.6, "alignment_sensitivity_monte_carlo": 0.7
+    },
+    "microfluidic_simulation": {
+        "cfd_microfluidics": 0.9, "simulate_perivascular_flow_3d": 0.8,
+        "design_brain_chip": 0.7, "multi_organ_ooc_simulation": 0.75
+    },
+    "brain_analysis": {
+        "analyze_brain_clearance": 0.9, "whole_brain_network_analysis": 0.85,
+        "two_sphere_model": 0.7, "visualize_brain_clearance": 0.75
+    },
+    "design_to_fabrication": {
+        "design_to_mint": 0.9, "fluigi_parchmint": 0.85,
+        "design_to_networkx": 0.8, "fluigi_compile": 0.8
+    },
+    "graph_analysis": {
+        "design_to_networkx": 0.9, "two_sphere_graph_mapping": 0.8,
+        "whole_brain_network_analysis": 0.7
+    }
+}
+
+# Cluster definitions for RLServiceAdvisor
+SERVICE_CLUSTERS = {
+    0: {
+        "name": "optics",
+        "services": ["ray_trace", "wavefront_analysis", "interferometric_sensing",
+                    "lock_in_detection", "absorption_spectroscopy",
+                    "cavity_ringdown_spectroscopy", "alignment_sensitivity_monte_carlo"],
+        "complexity_indicators": ["wavefront", "aberration", "interferometer", "spectroscopy", "fiber"]
+    },
+    1: {
+        "name": "microfluidics",
+        "services": ["cfd_microfluidics", "simulate_perivascular_flow",
+                    "simulate_perivascular_flow_3d", "design_brain_chip_channel",
+                    "multi_organ_ooc_simulation"],
+        "complexity_indicators": ["cfd", "flow", "channel", "organ-on-chip", "perivascular", "stokes"]
+    },
+    2: {
+        "name": "brain",
+        "services": ["two_sphere_model", "two_sphere_graph_mapping",
+                    "whole_brain_network_analysis", "analyze_brain_clearance",
+                    "visualize_brain_clearance", "design_brain_chip",
+                    "analyze_clearance_network"],
+        "complexity_indicators": ["glymphatic", "clearance", "connectivity", "fmri", "hemisphere", "brain"]
+    },
+    3: {
+        "name": "fluigi",
+        "services": ["design_to_networkx", "design_to_mint", "networkx_to_mint",
+                    "fluigi_compile", "fluigi_parchmint"],
+        "complexity_indicators": ["mint", "parchmint", "networkx", "place-and-route", "fabrication"]
+    },
+}
+
+# Gateway required fields (service_gateway.py compatible)
+GATEWAY_REQUIREMENTS = {
+    "ray_trace": {"required": ["surface_data"], "types": {"surface_data": dict}},
+    "design_to_networkx": {"required": ["design_json"], "types": {"design_json": dict}},
+    "design_to_mint": {"required": [], "types": {}},  # design_json OR graph_data
+    "fluigi_compile": {"required": [], "types": {}},  # mint_code OR mint_file
+    "fluigi_parchmint": {"required": [], "types": {}},
+    "networkx_to_mint": {"required": ["nodes", "edges"], "types": {"nodes": list, "edges": list}},
+    "analyze_brain_clearance": {"required": ["connectivity_matrix"], "types": {"connectivity_matrix": list}},
+}
+
+SERVICE_ADVICE = {
+    "service_name": "twosphere-mcp",
+    "version": "1.0.0",
+    "description": "Optical physics, MRI spherical geometry, brain microfluidics, and Fluigi integration service.",
+    "functor_level": "F3",  # Code/Implementation level in F0-F4 hierarchy
+
+    # RLServiceAdvisor compatible
+    "service_catalog": SERVICE_CATALOG,
+    "context_templates": CONTEXT_TEMPLATES,
+    "clusters": SERVICE_CLUSTERS,
+    "gateway_requirements": GATEWAY_REQUIREMENTS,
+
+    "domains": {
+        "optics": {
+            "description": "Optical system design, ray tracing, interferometry, absorption spectroscopy",
+            "tools": ["ray_trace", "wavefront_analysis", "interferometric_sensing", "lock_in_detection",
+                     "absorption_spectroscopy", "cavity_ringdown_spectroscopy", "alignment_sensitivity_monte_carlo"],
+            "use_when": "Designing optical components for LOC chips, analyzing wavefronts, fiber coupling"
+        },
+        "microfluidics": {
+            "description": "Lab-on-chip design, CFD simulation, perivascular flow modeling",
+            "tools": ["cfd_microfluidics", "simulate_perivascular_flow", "simulate_perivascular_flow_3d",
+                     "design_brain_chip_channel", "multi_organ_ooc_simulation"],
+            "use_when": "Designing microfluidic channels, simulating flow, organ-on-chip systems"
+        },
+        "brain": {
+            "description": "Brain network analysis, glymphatic clearance, two-sphere geometry",
+            "tools": ["two_sphere_model", "two_sphere_graph_mapping", "whole_brain_network_analysis",
+                     "analyze_brain_clearance", "visualize_brain_clearance", "design_brain_chip",
+                     "analyze_clearance_network"],
+            "use_when": "Analyzing brain connectivity, modeling glymphatic flow, paired hemisphere analysis"
+        },
+        "fluigi": {
+            "description": "Microfluidic design automation via Fluigi place-and-route",
+            "tools": ["design_to_networkx", "design_to_mint", "networkx_to_mint",
+                     "fluigi_compile", "fluigi_parchmint"],
+            "use_when": "Converting designs to physical layouts, generating fabrication files, F2->F3 pipeline"
+        }
+    },
+    "routing_hints": {
+        "keywords": ["optical", "microfluidic", "brain", "glymphatic", "two-sphere", "LOC", "chip",
+                    "CFD", "flow", "MINT", "Fluigi", "parchmint", "networkx"],
+        "input_types": ["connectivity_matrix", "time_series", "graph", "design_json", "mint_code"],
+        "output_types": ["visualization", "metrics", "mint_code", "parchmint_json", "networkx_graph"],
+        "query_types": list(CONTEXT_TEMPLATES.keys())
+    }
+}
+
+
+def advice() -> Dict[str, Any]:
+    """
+    Service advice method (generate_service_pseudocode.py compatible).
+
+    This static method provides service metadata for:
+    - RLServiceAdvisor Q-table bootstrapping
+    - Pseudocode generation
+    - Service discovery and routing
+    """
+    return {
+        # Core metadata
+        "description": "Optical physics, MRI spherical geometry, brain microfluidics, and Fluigi integration service (F3 level)",
+        "version": "1.0.0",
+
+        # Capabilities for clustering
+        "capabilities": [
+            "optical_design", "ray_tracing", "wavefront_analysis",
+            "microfluidic_simulation", "cfd", "stokes_flow",
+            "brain_network_analysis", "glymphatic_clearance", "two_sphere_geometry",
+            "fluigi_integration", "mint_generation", "parchmint_conversion",
+            "networkx_graphs", "design_automation"
+        ],
+
+        # Workflow for pseudocode generation
+        "workflow": [
+            "1. Receive design request (connectivity matrix, design JSON, or MINT code)",
+            "2. Route to appropriate domain tool (optics/microfluidics/brain/fluigi)",
+            "3. Execute simulation or conversion",
+            "4. Return results (metrics, visualization, or fabrication files)"
+        ],
+
+        # Performance metrics for RLServiceAdvisor
+        "performance": "Variable: 0.5s (conversions) to 15s (CFD simulations)",
+        "memory_usage": "Low-Medium: 50MB-500MB depending on simulation complexity",
+
+        # Best use cases
+        "best_for": [
+            "Lab-on-chip optical system design",
+            "Brain-mimetic microfluidic chip design",
+            "Glymphatic clearance modeling from fMRI data",
+            "Converting designs to Fluigi MINT format",
+            "Generating Parchmint JSON for fabrication"
+        ],
+
+        # RLServiceAdvisor integration
+        "service_catalog": SERVICE_CATALOG,
+        "context_templates": CONTEXT_TEMPLATES,
+        "clusters": SERVICE_CLUSTERS,
+        "gateway_requirements": GATEWAY_REQUIREMENTS,
+
+        # Routing hints
+        "complexity_indicators": ["wavefront", "cfd", "glymphatic", "connectivity", "mint", "parchmint"],
+        "domain_tags": ["physics", "optics", "microfluidics", "neuroscience", "fabrication"],
+        "functor_level": "F3"
+    }
+
+
+async def handle_advice(args: Dict[str, Any]) -> Dict[str, Any]:
+    """Return service guidance for agent routing."""
+    domain = args.get("domain", "all")
+    verbose = args.get("verbose", False)
+
+    # Get base advice from static method
+    base_advice = advice()
+
+    result = {
+        "service_name": SERVICE_ADVICE["service_name"],
+        "version": base_advice["version"],
+        "description": base_advice["description"],
+        "functor_level": base_advice["functor_level"],
+        "routing_hints": SERVICE_ADVICE["routing_hints"],
+
+        # Include advice() compatible fields for pseudocode generator
+        "capabilities": base_advice["capabilities"],
+        "workflow": base_advice["workflow"],
+        "performance": base_advice["performance"],
+        "memory_usage": base_advice["memory_usage"],
+        "best_for": base_advice["best_for"],
+    }
+
+    if domain == "all":
+        result["domains"] = SERVICE_ADVICE["domains"]
+        result["service_catalog"] = SERVICE_CATALOG
+        result["context_templates"] = CONTEXT_TEMPLATES
+        if verbose:
+            # Include all tools with their descriptions
+            tools = await list_tools()
+            result["tools_detail"] = {t.name: t.description for t in tools}
+    else:
+        if domain in SERVICE_ADVICE["domains"]:
+            result["domain_info"] = SERVICE_ADVICE["domains"][domain]
+            # Filter service catalog to domain
+            domain_tools = SERVICE_ADVICE["domains"][domain]["tools"]
+            result["service_catalog"] = {k: v for k, v in SERVICE_CATALOG.items() if k in domain_tools}
+            if verbose:
+                # Include detailed tool info for this domain
+                tools = await list_tools()
+                result["tools_detail"] = {
+                    t.name: {"description": t.description, "schema": t.inputSchema}
+                    for t in tools if t.name in domain_tools
+                }
+        else:
+            result["error"] = f"Unknown domain: {domain}"
+            result["available_domains"] = list(SERVICE_ADVICE["domains"].keys())
+
+    result["pseudocode"] = """
+SERVICE twosphere-mcp:
+    # F3 Implementation Service for Physics/Microfluidics
+
+    ## Meta Tools
+    FUNCTION advice(domain?)
+        # Returns service capabilities, workflow, and routing hints
+        RETURN {description, capabilities, workflow, performance, best_for}
+    END FUNCTION
+
+    FUNCTION health_check(subsystems?)
+        # Verifies Fluigi, FreeCAD, ernie2_swarm dependencies
+        FOR each subsystem in [fluigi, freecad, ernie2, core_deps]
+            status[subsystem] := check_availability(subsystem)
+        ENDFOR
+        RETURN {status, warnings}
+    END FUNCTION
+
+    ## Optical Tools
+    FUNCTION ray_trace(surface_data, ray_config)
+        rays := generate_rays(ray_config)
+        traced := trace_through_surface(rays, surface_data)
+        RETURN {paths, intersections, aberrations}
+    END FUNCTION
+
+    FUNCTION wavefront_analysis(wavefront_data)
+        zernike := fit_zernike_polynomials(wavefront_data)
+        RETURN {coefficients, rms_error, strehl_ratio}
+    END FUNCTION
+
+    ## Microfluidics Tools
+    FUNCTION cfd_microfluidics(geometry, params)
+        mesh := generate_mesh(geometry)
+        solution := solve_stokes_flow(mesh, params)
+        RETURN {velocity_field, pressure_drop, shear_stress}
+    END FUNCTION
+
+    FUNCTION design_brain_chip(connectivity_matrix)
+        graph := matrix_to_graph(connectivity_matrix)
+        layout := optimize_planar_layout(graph)
+        channels := generate_channel_network(layout)
+        RETURN {chambers, channels, ports, design_json}
+    END FUNCTION
+
+    ## Brain Analysis Tools
+    FUNCTION analyze_brain_clearance(connectivity_matrix, brain_state)
+        network := build_clearance_network(connectivity_matrix)
+        clearance := compute_glymphatic_clearance(network, brain_state)
+        RETURN {clearance_rates, risk_regions, disc_dimension}
+    END FUNCTION
+
+    ## Fluigi Pipeline (F2 Design -> F3 Code)
+    FUNCTION design_to_networkx(design_json)
+        G := DiGraph()
+        FOR each chamber in design_json.chambers
+            G.add_node(chamber, mint_type="NODE")
+        ENDFOR
+        FOR each channel in design_json.channels
+            G.add_edge(channel.source, channel.target)
+        ENDFOR
+        RETURN {graph_data, metrics}
+    END FUNCTION
+
+    FUNCTION design_to_mint(design_json OR graph_data)
+        IF graph_data THEN
+            G := node_link_graph(graph_data)
+        ELSE
+            G := design_to_networkx(design_json)
+        ENDIF
+        mint_code := nx_to_mint(G, device_name)
+        RETURN {mint_code, node_count, edge_count}
+    END FUNCTION
+
+    FUNCTION fluigi_parchmint(mint_code)
+        CALL fluigi convert-to-parchmint mint_file -o output_dir
+        parchmint := load_json(output_dir/device.json)
+        RETURN {parchmint, components, connections}
+    END FUNCTION
+"""
+
+    result["tool"] = "advice"
+    return result
+
+
+async def handle_health_check(args: Dict[str, Any]) -> Dict[str, Any]:
+    """Check service health and dependency status."""
+    import subprocess
+    import shutil
+
+    check_fluigi = args.get("check_fluigi", True)
+    check_freecad = args.get("check_freecad", False)
+    check_ernie2 = args.get("check_ernie2", False)
+
+    result = {
+        "service": "twosphere-mcp",
+        "status": "healthy",
+        "checks": {},
+        "warnings": []
+    }
+
+    # Core Python dependencies
+    core_deps = {
+        "numpy": False,
+        "networkx": False,
+        "scipy": False,
+    }
+    for dep in core_deps:
+        try:
+            __import__(dep)
+            core_deps[dep] = True
+        except ImportError:
+            core_deps[dep] = False
+            result["warnings"].append(f"Missing core dependency: {dep}")
+
+    result["checks"]["core_dependencies"] = core_deps
+
+    # Check Fluigi
+    if check_fluigi:
+        fluigi_status = {"available": False, "version": None, "path": None}
+        try:
+            fluigi_path = shutil.which("fluigi")
+            if fluigi_path:
+                fluigi_status["path"] = fluigi_path
+                proc = subprocess.run(["fluigi", "--version"], capture_output=True, text=True, timeout=5)
+                if proc.returncode == 0:
+                    fluigi_status["available"] = True
+                    fluigi_status["version"] = proc.stdout.strip() or proc.stderr.strip()
+                else:
+                    fluigi_status["error"] = proc.stderr
+            else:
+                fluigi_status["error"] = "fluigi not in PATH"
+                result["warnings"].append("Fluigi not available - install pyfluigi")
+        except Exception as e:
+            fluigi_status["error"] = str(e)
+
+        result["checks"]["fluigi"] = fluigi_status
+
+        # Check nx_bridge
+        nx_bridge_status = {"available": False}
+        try:
+            sys.path.insert(0, os.path.expanduser("~/pyfluigi"))
+            from fluigi.nx_bridge import nx_to_mint
+            nx_bridge_status["available"] = True
+        except ImportError as e:
+            nx_bridge_status["error"] = str(e)
+            result["warnings"].append("nx_bridge not available")
+
+        result["checks"]["nx_bridge"] = nx_bridge_status
+
+    # Check FreeCAD RPC
+    if check_freecad:
+        freecad_status = {"available": False}
+        try:
+            import xmlrpc.client
+            proxy = xmlrpc.client.ServerProxy("http://localhost:9875")
+            proxy.system.listMethods()
+            freecad_status["available"] = True
+            freecad_status["endpoint"] = "http://localhost:9875"
+        except Exception as e:
+            freecad_status["error"] = str(e)
+            result["warnings"].append("FreeCAD RPC not available")
+
+        result["checks"]["freecad"] = freecad_status
+
+    # Check ernie2_swarm
+    if check_ernie2:
+        ernie2_status = {"available": False}
+        try:
+            from backend.services.ernie2_integration import YadaServicesMCPClient
+            ernie2_status["available"] = True
+        except ImportError as e:
+            ernie2_status["error"] = str(e)
+
+        result["checks"]["ernie2"] = ernie2_status
+
+    # Overall status
+    critical_failures = [
+        not core_deps.get("numpy", False),
+        not core_deps.get("networkx", False),
+    ]
+    if any(critical_failures):
+        result["status"] = "degraded"
+
+    if check_fluigi and not result["checks"].get("fluigi", {}).get("available"):
+        result["status"] = "degraded" if result["status"] == "healthy" else result["status"]
+
+    result["tool"] = "health_check"
+    return result
 
 
 async def handle_two_sphere_model(args: Dict[str, Any]) -> Dict[str, Any]:
@@ -2202,6 +3106,529 @@ async def handle_design_brain_chip_channel(args: Dict[str, Any]) -> Dict[str, An
             "traceback": traceback.format_exc(),
             "tool": "design_brain_chip_channel"
         }
+
+
+async def handle_visualize_brain_clearance(args: Dict[str, Any]) -> Dict[str, Any]:
+    """Visualize brain clearance on two-sphere model."""
+    try:
+        import numpy as np
+        from backend.visualization.clearance_visualization import visualize_brain_clearance
+
+        # Get parameters
+        connectivity_matrix = np.array(args.get("connectivity_matrix", []))
+        if connectivity_matrix.size == 0:
+            return {"error": "connectivity_matrix is required"}
+
+        n_regions = connectivity_matrix.shape[0]
+        region_labels = args.get("region_labels", [f"region_{i}" for i in range(n_regions)])
+        brain_state = args.get("brain_state", "awake")
+        compare_sleep_wake = args.get("compare_sleep_wake", False)
+        show_risk = args.get("show_risk", False)
+        save_path = args.get("save_path")
+
+        # Generate visualization
+        result = await visualize_brain_clearance(
+            connectivity_matrix,
+            region_labels,
+            brain_state=brain_state,
+            compare_sleep_wake=compare_sleep_wake,
+            show_risk=show_risk,
+            save_path=save_path,
+        )
+
+        result["tool"] = "visualize_brain_clearance"
+        return result
+
+    except Exception as e:
+        import traceback
+        return {
+            "error": str(e),
+            "traceback": traceback.format_exc(),
+            "tool": "visualize_brain_clearance"
+        }
+
+
+async def handle_design_brain_chip(args: Dict[str, Any]) -> Dict[str, Any]:
+    """Design brain-mimetic microfluidic chip."""
+    try:
+        import numpy as np
+        from backend.simulation.brain_chip_designer import (
+            BrainChipDesigner,
+            FreeCADExporter,
+            design_brain_chip,
+        )
+
+        # Get parameters
+        connectivity_matrix = args.get("connectivity_matrix")
+        n_regions = args.get("n_regions", 5)
+        network_type = args.get("network_type", "planar")
+        channel_diameter_um = args.get("channel_diameter_um", 50)
+        export_to_freecad = args.get("export_to_freecad", False)
+        comparison_set = args.get("comparison_set", False)
+
+        designer = BrainChipDesigner()
+
+        if comparison_set:
+            # Generate comparison set
+            designs = designer.design_comparison_set(n_regions)
+            result = {
+                "comparison_set": True,
+                "designs": {
+                    name: design.to_dict()
+                    for name, design in designs.items()
+                },
+            }
+
+            if export_to_freecad:
+                exporter = FreeCADExporter()
+                if exporter.connect():
+                    export_results = exporter.export_comparison_set(designs)
+                    result["freecad_exports"] = export_results
+                else:
+                    result["freecad_error"] = "Could not connect to FreeCAD RPC"
+
+        else:
+            # Single design
+            conn_matrix = np.array(connectivity_matrix) if connectivity_matrix else None
+            result = design_brain_chip(
+                connectivity_matrix=conn_matrix,
+                n_regions=n_regions,
+                network_type=network_type,
+                channel_diameter_um=channel_diameter_um,
+                export_to_freecad=export_to_freecad,
+            )
+
+        result["tool"] = "design_brain_chip"
+        return result
+
+    except Exception as e:
+        import traceback
+        return {
+            "error": str(e),
+            "traceback": traceback.format_exc(),
+            "tool": "design_brain_chip"
+        }
+
+
+async def handle_simulate_perivascular_flow_3d(args: Dict[str, Any]) -> Dict[str, Any]:
+    """Simulate 3D perivascular CSF flow."""
+    try:
+        from backend.simulation.cfd_3d import CFD3DSimulator
+
+        # Get parameters
+        vessel_radius = args.get("vessel_radius_um", 25)
+        gap_thickness = args.get("gap_thickness_um", 15)
+        length = args.get("length_um", 1000)
+        pressure_gradient = args.get("pressure_gradient_Pa_m", 100)
+        geometry_type = args.get("geometry_type", "straight")
+        resolution = args.get("resolution", 20)
+        brain_state = args.get("brain_state", "awake")
+        compare_geometries = args.get("compare_geometries", False)
+
+        # Create simulator
+        simulator = CFD3DSimulator()
+
+        if compare_geometries:
+            # Compare different geometries
+            result = simulator.compare_geometries(
+                vessel_radius_um=vessel_radius,
+                gap_thickness_um=gap_thickness,
+                length_um=length,
+                pressure_gradient_Pa_m=pressure_gradient,
+            )
+        else:
+            # Single geometry simulation
+            result = simulator.simulate_perivascular_flow_3d(
+                vessel_radius_um=vessel_radius,
+                gap_thickness_um=gap_thickness,
+                length_um=length,
+                pressure_gradient_Pa_m=pressure_gradient,
+                geometry_type=geometry_type,
+                resolution=resolution,
+                brain_state=brain_state,
+            )
+
+        result["tool"] = "simulate_perivascular_flow_3d"
+        return result
+
+    except Exception as e:
+        import traceback
+        return {
+            "error": str(e),
+            "traceback": traceback.format_exc(),
+            "tool": "simulate_perivascular_flow_3d"
+        }
+
+
+async def handle_analyze_brain_clearance(args: Dict[str, Any]) -> Dict[str, Any]:
+    """Analyze brain glymphatic clearance from fMRI connectivity."""
+    try:
+        import numpy as np
+        from backend.simulation.glymphatic_fmri_integration import (
+            GlymphaticFMRIIntegrator,
+            BrainState,
+        )
+
+        # Check for expert query
+        expert_response = None
+        expert_query = args.get("expert_query")
+        if expert_query:
+            expert_response = await query_domain_experts(
+                question=expert_query,
+                tool_name="microfluidics",
+                collections=["docs_library_neuroscience_MRI", "docs_library_bioengineering_LOC"]
+            )
+
+        # Get connectivity matrix
+        connectivity_matrix = np.array(args.get("connectivity_matrix", []))
+        if connectivity_matrix.size == 0:
+            return {"error": "connectivity_matrix is required"}
+
+        # Get region labels or generate defaults
+        n_regions = connectivity_matrix.shape[0]
+        region_labels = args.get("region_labels", [f"region_{i}" for i in range(n_regions)])
+
+        # Get brain state
+        state_str = args.get("brain_state", "awake")
+        brain_state = {
+            "awake": BrainState.AWAKE,
+            "sleep": BrainState.SLEEP,
+            "anesthesia": BrainState.ANESTHESIA,
+        }.get(state_str, BrainState.AWAKE)
+
+        compute_amyloid = args.get("compute_amyloid", False)
+        compare_sleep_wake = args.get("compare_sleep_wake", False)
+
+        # Create integrator
+        integrator = GlymphaticFMRIIntegrator()
+
+        # Run analysis
+        if compare_sleep_wake:
+            # Comparison mode - analyze both states
+            result = await integrator.compare_sleep_wake_clearance(
+                connectivity_matrix,
+                region_labels,
+            )
+        else:
+            # Single state analysis
+            analysis = await integrator.analyze_from_connectivity_matrix(
+                connectivity_matrix,
+                region_labels,
+                brain_state=brain_state,
+                compute_amyloid=compute_amyloid,
+            )
+            result = analysis.to_dict()
+
+        # Include expert response if queried
+        if expert_response and expert_response.get("answer"):
+            result["expert_guidance"] = expert_response["answer"]
+            result["expert_collections"] = expert_response.get("collections_queried", [])
+
+        result["tool"] = "analyze_brain_clearance"
+        return result
+
+    except Exception as e:
+        import traceback
+        return {
+            "error": str(e),
+            "traceback": traceback.format_exc(),
+            "tool": "analyze_brain_clearance"
+        }
+
+
+# =============================================================================
+# Fluigi/NetworkX Integration Handlers
+# =============================================================================
+
+async def handle_design_to_networkx(args: Dict[str, Any]) -> Dict[str, Any]:
+    """Convert ChipDesign to NetworkX graph."""
+    try:
+        import networkx as nx
+
+        design_json = args.get("design_json", {})
+        include_metrics = args.get("include_metrics", True)
+
+        # Build NetworkX graph from design JSON
+        G = nx.DiGraph()
+
+        # Add chambers as nodes
+        chambers = design_json.get("chambers", [])
+        for chamber in chambers:
+            name = chamber.get("name", f"chamber_{len(G.nodes)}")
+            G.add_node(name,
+                      mint_type="NODE",
+                      width=chamber.get("width", 1000),
+                      height=chamber.get("height", 1000),
+                      pos=chamber.get("center", [0, 0])[:2] if chamber.get("center") else None)
+
+        # Add ports
+        inlet_ports = design_json.get("inlet_ports", [])
+        for i, port in enumerate(inlet_ports):
+            name = port.get("name", f"inlet_{i}")
+            G.add_node(name, mint_type="PORT", port_radius=500)
+
+        outlet_ports = design_json.get("outlet_ports", [])
+        for i, port in enumerate(outlet_ports):
+            name = port.get("name", f"outlet_{i}")
+            G.add_node(name, mint_type="PORT", port_radius=500)
+
+        # Add main inlet/outlet if present
+        if design_json.get("main_inlet_position"):
+            G.add_node("main_inlet", mint_type="PORT", port_radius=500)
+        if design_json.get("main_outlet_position"):
+            G.add_node("main_outlet", mint_type="PORT", port_radius=500)
+
+        # Add channels as edges
+        channels = design_json.get("channels", [])
+        for channel in channels:
+            source = channel.get("source", channel.get("from"))
+            target = channel.get("target", channel.get("to"))
+            if source and target:
+                G.add_edge(source, target,
+                          width=channel.get("width", 100),
+                          name=channel.get("name"))
+
+        # Compute metrics if requested
+        result = {
+            "nodes": list(G.nodes()),
+            "edges": [(u, v) for u, v in G.edges()],
+            "node_count": G.number_of_nodes(),
+            "edge_count": G.number_of_edges(),
+        }
+
+        if include_metrics and G.number_of_nodes() > 0:
+            result["metrics"] = {
+                "density": nx.density(G),
+                "is_connected": nx.is_weakly_connected(G) if G.is_directed() else nx.is_connected(G),
+            }
+            if G.number_of_nodes() > 1:
+                try:
+                    result["metrics"]["average_clustering"] = nx.average_clustering(G.to_undirected())
+                except:
+                    pass
+
+        # Include node_link_data for serialization
+        result["graph_data"] = nx.node_link_data(G)
+        result["tool"] = "design_to_networkx"
+
+        return result
+
+    except Exception as e:
+        import traceback
+        return {"error": str(e), "traceback": traceback.format_exc(), "tool": "design_to_networkx"}
+
+
+async def handle_design_to_mint(args: Dict[str, Any]) -> Dict[str, Any]:
+    """Convert ChipDesign or NetworkX graph to MINT format."""
+    try:
+        import networkx as nx
+        sys.path.insert(0, os.path.expanduser("~/pyfluigi"))
+        from fluigi.nx_bridge import nx_to_mint, MintComponentType
+
+        design_json = args.get("design_json")
+        graph_data = args.get("graph_data")
+        device_name = args.get("device_name", "chip")
+        default_channel_width = args.get("default_channel_width", 100)
+
+        if graph_data:
+            # Direct from NetworkX node_link_data
+            G = nx.node_link_graph(graph_data)
+        elif design_json:
+            # Convert design to graph first
+            G = nx.DiGraph()
+
+            # Add chambers
+            for chamber in design_json.get("chambers", []):
+                name = chamber.get("name", f"chamber_{len(G.nodes)}")
+                G.add_node(name, mint_type="NODE")
+
+            # Add ports
+            for i, port in enumerate(design_json.get("inlet_ports", [])):
+                name = port.get("name", f"inlet_{i}")
+                G.add_node(name, mint_type="PORT", port_radius=500)
+            for i, port in enumerate(design_json.get("outlet_ports", [])):
+                name = port.get("name", f"outlet_{i}")
+                G.add_node(name, mint_type="PORT", port_radius=500)
+
+            if design_json.get("main_inlet_position"):
+                G.add_node("main_inlet", mint_type="PORT", port_radius=500)
+            if design_json.get("main_outlet_position"):
+                G.add_node("main_outlet", mint_type="PORT", port_radius=500)
+
+            # Add channels
+            for channel in design_json.get("channels", []):
+                source = channel.get("source", channel.get("from"))
+                target = channel.get("target", channel.get("to"))
+                if source and target:
+                    G.add_edge(source, target, width=channel.get("width", default_channel_width))
+        else:
+            return {"error": "Either design_json or graph_data required", "tool": "design_to_mint"}
+
+        # Convert to MINT
+        mint_code = nx_to_mint(G, device_name=device_name, default_channel_width=default_channel_width)
+
+        return {
+            "mint_code": mint_code,
+            "device_name": device_name,
+            "node_count": G.number_of_nodes(),
+            "edge_count": G.number_of_edges(),
+            "tool": "design_to_mint"
+        }
+
+    except Exception as e:
+        import traceback
+        return {"error": str(e), "traceback": traceback.format_exc(), "tool": "design_to_mint"}
+
+
+async def handle_fluigi_compile(args: Dict[str, Any]) -> Dict[str, Any]:
+    """Compile MINT code using Fluigi."""
+    try:
+        import subprocess
+        import tempfile
+
+        mint_code = args.get("mint_code")
+        mint_file = args.get("mint_file")
+        output_dir = args.get("output_dir", "/tmp/fluigi_output")
+
+        os.makedirs(output_dir, exist_ok=True)
+
+        # Write MINT code to temp file if provided directly
+        if mint_code:
+            mint_file = os.path.join(output_dir, "input.mint")
+            with open(mint_file, "w") as f:
+                f.write(mint_code)
+
+        if not mint_file:
+            return {"error": "Either mint_code or mint_file required", "tool": "fluigi_compile"}
+
+        # Run fluigi mint-compile
+        result = subprocess.run(
+            ["fluigi", "mint-compile", mint_file, "-o", output_dir],
+            capture_output=True,
+            text=True,
+            timeout=60
+        )
+
+        return {
+            "success": result.returncode == 0,
+            "stdout": result.stdout,
+            "stderr": result.stderr,
+            "return_code": result.returncode,
+            "output_dir": output_dir,
+            "mint_file": mint_file,
+            "tool": "fluigi_compile"
+        }
+
+    except subprocess.TimeoutExpired:
+        return {"error": "Fluigi compile timed out", "tool": "fluigi_compile"}
+    except FileNotFoundError:
+        return {"error": "Fluigi not found. Ensure pyfluigi is installed and fluigi is in PATH.", "tool": "fluigi_compile"}
+    except Exception as e:
+        import traceback
+        return {"error": str(e), "traceback": traceback.format_exc(), "tool": "fluigi_compile"}
+
+
+async def handle_fluigi_parchmint(args: Dict[str, Any]) -> Dict[str, Any]:
+    """Convert MINT to Parchmint JSON using Fluigi."""
+    try:
+        import subprocess
+
+        mint_code = args.get("mint_code")
+        mint_file = args.get("mint_file")
+        output_dir = args.get("output_dir", "/tmp/fluigi_output")
+
+        os.makedirs(output_dir, exist_ok=True)
+
+        # Write MINT code to temp file if provided directly
+        if mint_code:
+            mint_file = os.path.join(output_dir, "input.mint")
+            with open(mint_file, "w") as f:
+                f.write(mint_code)
+
+        if not mint_file:
+            return {"error": "Either mint_code or mint_file required", "tool": "fluigi_parchmint"}
+
+        # Run fluigi convert-to-parchmint
+        result = subprocess.run(
+            ["fluigi", "convert-to-parchmint", mint_file, "-o", output_dir],
+            capture_output=True,
+            text=True,
+            timeout=60
+        )
+
+        # Try to read the output JSON
+        parchmint_json = None
+        device_name = os.path.splitext(os.path.basename(mint_file))[0]
+        json_path = os.path.join(output_dir, f"{device_name}.json")
+
+        if os.path.exists(json_path):
+            with open(json_path) as f:
+                parchmint_json = json.load(f)
+
+        return {
+            "success": result.returncode == 0,
+            "stdout": result.stdout,
+            "stderr": result.stderr,
+            "return_code": result.returncode,
+            "output_dir": output_dir,
+            "json_path": json_path if os.path.exists(json_path) else None,
+            "parchmint": parchmint_json,
+            "tool": "fluigi_parchmint"
+        }
+
+    except subprocess.TimeoutExpired:
+        return {"error": "Fluigi convert timed out", "tool": "fluigi_parchmint"}
+    except FileNotFoundError:
+        return {"error": "Fluigi not found. Ensure pyfluigi is installed and fluigi is in PATH.", "tool": "fluigi_parchmint"}
+    except Exception as e:
+        import traceback
+        return {"error": str(e), "traceback": traceback.format_exc(), "tool": "fluigi_parchmint"}
+
+
+async def handle_networkx_to_mint(args: Dict[str, Any]) -> Dict[str, Any]:
+    """Direct conversion from node/edge lists to MINT format."""
+    try:
+        import networkx as nx
+        sys.path.insert(0, os.path.expanduser("~/pyfluigi"))
+        from fluigi.nx_bridge import nx_to_mint, MintComponentType
+
+        nodes = args.get("nodes", [])
+        edges = args.get("edges", [])
+        device_name = args.get("device_name", "device")
+        default_channel_width = args.get("default_channel_width", 100)
+
+        # Build graph
+        G = nx.DiGraph()
+
+        # Add nodes
+        for node in nodes:
+            node_id = node.get("id")
+            mint_type = node.get("mint_type", "NODE")
+            attrs = {k: v for k, v in node.items() if k not in ("id",)}
+            attrs["mint_type"] = mint_type
+            G.add_node(node_id, **attrs)
+
+        # Add edges
+        for edge in edges:
+            source = edge.get("source")
+            target = edge.get("target")
+            width = edge.get("width", default_channel_width)
+            G.add_edge(source, target, width=width)
+
+        # Convert to MINT
+        mint_code = nx_to_mint(G, device_name=device_name, default_channel_width=default_channel_width)
+
+        return {
+            "mint_code": mint_code,
+            "device_name": device_name,
+            "node_count": len(nodes),
+            "edge_count": len(edges),
+            "tool": "networkx_to_mint"
+        }
+
+    except Exception as e:
+        import traceback
+        return {"error": str(e), "traceback": traceback.format_exc(), "tool": "networkx_to_mint"}
 
 
 # =============================================================================

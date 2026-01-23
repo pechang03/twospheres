@@ -279,6 +279,118 @@ class ChipDesign:
             }
         }
 
+    def to_networkx(self):
+        """Convert chip design to NetworkX graph for Fluigi pipeline.
+
+        Creates a directed graph where:
+        - Chambers become nodes with mint_type=CHAMBER
+        - Main inlet/outlet become PORT nodes
+        - Inlet ports become PORT nodes
+        - Channels become edges with width attribute
+
+        Returns:
+            nx.DiGraph suitable for nx_to_mint() conversion
+
+        Example:
+            >>> chip = designer.design_latin_square_mixer(n=4)
+            >>> G = chip.to_networkx()
+            >>> from fluigi.nx_bridge import nx_to_mint
+            >>> mint_code = nx_to_mint(G, device_name='latin_square')
+        """
+        import networkx as nx
+
+        G = nx.DiGraph()
+
+        # Track chamber positions for edge creation
+        chamber_positions = {}
+
+        # Add chambers as nodes
+        # Note: Use NODE type for MINT compatibility - CHAMBER isn't a standalone MINT keyword
+        for chamber in self.chambers:
+            node_name = chamber.name or f"chamber_{len(chamber_positions)}"
+            G.add_node(
+                node_name,
+                mint_type="NODE",  # NODE is valid MINT; CHAMBER alone is not
+                width=chamber.width * 1000,  # mm to µm (stored as metadata)
+                height=chamber.height * 1000,
+                pos=chamber.center[:2],  # (x, y) position
+            )
+            chamber_positions[chamber.center[:2]] = node_name
+
+        # Add main inlet/outlet as PORT nodes
+        G.add_node(
+            "main_inlet",
+            mint_type="PORT",
+            port_radius=500,
+            pos=self.main_inlet_position[:2],
+        )
+        G.add_node(
+            "main_outlet",
+            mint_type="PORT",
+            port_radius=500,
+            pos=self.main_outlet_position[:2],
+        )
+
+        # Add inlet ports as PORT nodes
+        for port in self.inlet_ports:
+            port_name = f"port_{port.chamber_name}"
+            G.add_node(
+                port_name,
+                mint_type="PORT",
+                port_radius=port.port_diameter_um,
+                pos=port.position[:2],
+            )
+
+        # Helper to find nearest node to a position
+        def find_nearest_node(pos, exclude=None):
+            min_dist = float('inf')
+            nearest = None
+            for node in G.nodes():
+                if exclude and node == exclude:
+                    continue
+                node_pos = G.nodes[node].get('pos', (0, 0))
+                dist = ((pos[0] - node_pos[0])**2 + (pos[1] - node_pos[1])**2)**0.5
+                if dist < min_dist:
+                    min_dist = dist
+                    nearest = node
+            return nearest, min_dist
+
+        # Add channels as edges
+        for channel in self.channels:
+            start_pos = channel.start[:2]
+            end_pos = channel.end[:2]
+
+            # Find nodes closest to channel endpoints
+            start_node, _ = find_nearest_node(start_pos)
+            end_node, _ = find_nearest_node(end_pos, exclude=start_node)
+
+            if start_node and end_node and start_node != end_node:
+                G.add_edge(
+                    start_node,
+                    end_node,
+                    width=channel.diameter_um,
+                    name=channel.name,
+                    length=channel.length_mm * 1000,  # mm to µm
+                )
+
+        # Add inlet channels (port to chamber connections)
+        for channel in self.inlet_channels:
+            start_pos = channel.start[:2]
+            end_pos = channel.end[:2]
+
+            start_node, _ = find_nearest_node(start_pos)
+            end_node, _ = find_nearest_node(end_pos, exclude=start_node)
+
+            if start_node and end_node and start_node != end_node:
+                G.add_edge(
+                    start_node,
+                    end_node,
+                    width=channel.diameter_um,
+                    name=channel.name or "inlet_channel",
+                )
+
+        return G
+
 
 class BrainChipDesigner:
     """Designer for brain-mimetic microfluidic chips.
