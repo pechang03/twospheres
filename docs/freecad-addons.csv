@@ -18,3 +18,4 @@ Assembly4,v0.50+,Installed,Assembly,Constraint-based assembly - chip + holder + 
 LCInterlocking,,Installed,Fabrication,Finger joints/interlocking for laser-cut enclosures
 ColorPalette,,Installed,UI,FreeCAD themes and color customization
 ElectroMagnetic,,Installed,Simulation,EM fields for electroosmotic/magnetohydrodynamic pumping
+Fasteners,,Installed,Assembly,Screws/nuts/washers for chip holder assemblies

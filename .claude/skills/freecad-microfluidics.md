@@ -29,7 +29,8 @@ Reference: `docs/freecad-addons.csv`
 ### Assembly
 - **Assembly4**: Constraint-based assembly - chip + holder + microscope setup
 - **STEMFIE**: Modular fixtures and chip holders
-- **boltsfc**: Standard fasteners for assemblies
+- **Fasteners**: Screws, nuts, washers - more comprehensive than boltsfc
+- **boltsfc**: Standard parts library (bolts/fasteners)
 
 ## Workflows
 
