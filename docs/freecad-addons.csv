@@ -3,7 +3,7 @@ name,version,status,category,use_case
 boltsfc,v2022.11.5,Up-to-date,Assembly,Standard parts library (bolts/fasteners)
 CfdOF,v1.33.3,Installed,Simulation,CFD with OpenFOAM - validate Stokes flow calculations
 Curved Shapes,v1.0.14,Pending restart,Geometry,Create curved/lofted geometries
-Curves workbench,v0.6.70,Pending restart,Geometry,Advanced curve tools (NURBS/Bezier)
+Curves workbench,v0.6.70,Pending restart,Geometry,NURBS/Bezier for lens surfaces and LOC serpentine channels
 Draft_Circle_3_Points,1.0.1 (git),Up-to-date,Geometry,Draft circles from 3 points
 FEMbyGEN,v2.5.2,Pending restart,Simulation,Finite Element Method - stress/thermal analysis
 HilbertCurve,1.2.0 (git),Up-to-date,Geometry,Space-filling curves for microfluidic mixers
@@ -17,3 +17,4 @@ FusedFilamentDesign,,Installed,Fabrication,Optimize designs for FDM 3D printing
 Assembly4,v0.50+,Installed,Assembly,Constraint-based assembly - chip + holder + microscope
 LCInterlocking,,Installed,Fabrication,Finger joints/interlocking for laser-cut enclosures
 ColorPalette,,Installed,UI,FreeCAD themes and color customization
+ElectroMagnetic,,Installed,Simulation,EM fields for electroosmotic/magnetohydrodynamic pumping

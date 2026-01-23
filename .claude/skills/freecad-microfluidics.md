@@ -10,6 +10,7 @@ Reference: `docs/freecad-addons.csv`
 ### Simulation
 - **CfdOF**: OpenFOAM CFD integration - validate Stokes flow (Re << 1)
 - **FEMbyGEN**: Finite Element Method for pressure/stress analysis
+- **ElectroMagnetic**: EM fields for electroosmotic (EOF) and magnetohydrodynamic (MHD) pumping
 
 ### Geometry
 - **HilbertCurve**: Space-filling curves for microfluidic mixers
@@ -122,7 +123,36 @@ import FreeCADServer
 FreeCADServer.start(port=9875)
 ```
 
-### 6. LCInterlocking Chip Enclosure
+### 6. Electroosmotic/Magnetic Flow Control
+
+**Addon**: ElectroMagnetic
+
+Design electrode placement for EOF pumping or magnetic valves:
+
+**Electroosmotic Flow (EOF)**:
+- Place electrodes at channel ends
+- Electric field drives flow (no moving parts)
+- Typical: 100-500 V/cm
+- Flow velocity: v = μ_eo × E (μ_eo ≈ 5×10⁻⁸ m²/V·s for PDMS)
+
+**Magnetic Valves**:
+- Embed ferrofluid or magnetic beads
+- External magnet stops/redirects flow
+- No contact with fluid
+
+**Workflow**:
+1. Define electrode positions in chip
+2. Use ElectroMagnetic to simulate E-field
+3. Calculate EOF velocity profile
+4. Verify field uniformity in channels
+5. Check for electrolysis at electrodes (keep V < 1.2V for water)
+
+**Applications**:
+- Programmable flow routing (no external pump)
+- Selective channel activation for Latin square
+- Magnetic sorting of cells/beads
+
+### 7. LCInterlocking Chip Enclosure
 
 Create a laser-cut acrylic enclosure with finger joints:
 
